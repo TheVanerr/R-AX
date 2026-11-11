@@ -1,0 +1,53 @@
+# GitHub Pages: app/ klasörünü PWA olarak yayınlar (https://thevanerr.github.io/R-AX/)
+# Veriler yayına girmez: projects/ ve models/ ayrı gizli depoda (riskanalizix-veri), uygulama onlara kullanıcının anahtarıyla bağlanır.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siteyi hazırla
+        run: |
+          mkdir _site
+          # Yalnız tarayıcıda çalışan dosyalar: geliştirme araçları, belgeler ve Windows kısayol betikleri yayına girmez
+          rsync -a \
+            --exclude 'araclar/' --exclude '*.md' --exclude 'kisayol-olustur.*' \
+            app/ _site/
+          # Service worker önbellek sürümü: her yayında yeni, eski önbellek silinir
+          sed -i "s/__SURUM__/${GITHUB_SHA::12}/" _site/sw.js
+          # Yayında veri klasörü olmamalı
+          test ! -e _site/projects && test ! -e _site/models
+          touch _site/.nojekyll
+          find _site -type f | sort
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risk Analizi</title>
+  <meta name="description" content="Dolfin endüstriyel parça yıkama makineleri için risk değerlendirme raporları">
+  <meta name="theme-color" content="#14161b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Risk Analizi">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/pwa/ikon-192.png">
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/rapor.css">
+</head>
+<body>
+  <div id="gate" class="gate hidden"></div>
+
+  <section id="home" class="home hidden">
+    <div class="home-bar">
+      <img src="assets/logos/dolfin.png" alt="Dolfin" class="home-logo" id="homeLogo">
+      <div class="home-title">
+        <h1>Risk Analizi</h1>
+        <p>EN ISO 12100 · EN ISO 13849-1 · EN 60204-1 · Gürültü · Termografi</p>
+      </div>
+      <div class="home-actions">
+        <button type="button" class="btn" id="btnRefreshHome" title="Klasörü yeniden tara">Yenile</button>
+        <button type="button" class="btn" id="btnNewProject" title="projects klasöründe yeni proje iskeleti">+ Yeni proje</button>
+      </div>
+    </div>
+    <div class="picker-bar">
+      <label for="homeComboInput">Makine modeli / proje</label>
+      <div class="combo" id="homeCombo"></div>
+    </div>
+    <nav class="home-nav">
+      <button type="button" class="home-tab active" data-home-tab="projects">Projeler <span class="home-count" id="countProjects"></span></button>
+      <button type="button" class="home-tab" data-home-tab="models">Modeller <span class="home-count" id="countModels"></span></button>
+      <div class="tb-spacer"></div>
+      <button type="button" class="home-link" id="btnFolder" title="Bağlı klasörü değiştir"></button>
+    </nav>
+    <div id="homeList" class="project-list"></div>
+  </section>
+
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <button type="button" class="tb-logo" id="btnHome" title="Ana ekrana dön"><img src="assets/logos/dolfin.png" alt="Dolfin" id="tbLogo"></button>
+      <div class="combo" id="topCombo"></div>
+      <div class="tb-doc"><strong id="docTitle"></strong><span id="docState"></span></div>
+      <div class="tb-spacer"></div>
+      <div class="tb-group"><div class="lang-seg" id="langSeg"></div></div>
+      <div class="tb-group">
+        <button type="button" class="btn btn-sm" id="btnMeasure" title="Ölçüm değerlerini ve fotoğraflarını gir (standart model raporu)">Ölçümler</button>
+        <button type="button" class="btn btn-sm" id="btnNewUnit" title="Bu model şablonundan yeni makine raporu: iş no, müşteri, sonra ölçümler">+ Yeni makine raporu</button>
+        <button type="button" class="btn btn-sm" id="btnCover" title="Kapak tasarımı">Kapak</button>
+        <button type="button" class="icon-btn" id="btnReload" title="md dosyalarını yeniden oku (F5 gerekmez; değişince kendiliğinden yenilenir)"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+      </div>
+      <div class="tb-group">
+        <button type="button" class="btn btn-sm btn-primary" id="btnPdf" title="Raporu doğrudan PDF olarak indirir (yazdırma penceresi açılmaz)"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>PDF İndir</button>
+      </div>
+    </header>
+
+    <!-- Kapak ve antet bilgileri: yazarken kapak ve antet güncellenir, alandan çıkınca md'ye kaydedilir -->
+    <div class="metabar" id="metaBar">
+      <label class="mb-f mb-doc"><span>Rapor no</span><input class="mb-in" data-mb="docNo" spellcheck="false" autocomplete="off" title="Kapakta ve her sayfanın antetinde yazar"></label>
+      <label class="mb-f mb-rev"><span>Rev</span><input class="mb-in" data-mb="rev" spellcheck="false" autocomplete="off" title="Yeni rev yazınca revizyon tablosuna satır eklenir"></label>
+      <label class="mb-f mb-date"><span>Tarih</span><input class="mb-in" data-mb="reportDate" type="date" title="Rapor tarihi (kapak ve revizyon tablosu)"></label>
+      <label class="mb-f mb-person"><span>Hazırlayan</span><input class="mb-in" data-mb="prepared" list="mbPeople" spellcheck="false" autocomplete="off"></label>
+      <label class="mb-f mb-person"><span>Kontrol eden</span><input class="mb-in" data-mb="checked" list="mbPeople" spellcheck="false" autocomplete="off"></label>
+      <label class="mb-f mb-person"><span>Onaylayan</span><input class="mb-in" data-mb="approved" list="mbPeople" spellcheck="false" autocomplete="off"></label>
+      <label class="mb-f mb-status"><span>Durum</span><select class="mb-in" data-mb="status" title="Kapaktaki damga: TASLAK / YAYINLANDI"><option value="draft">Taslak</option><option value="final">Yayın</option></select></label>
+      <span class="mb-state" id="mbState"></span>
+      <datalist id="mbPeople"></datalist>
+    </div>
+
+    <aside class="left-panel">
+      <nav class="panel-tabs">
+        <button type="button" class="panel-tab active" data-left="toc">İçindekiler</button>
+        <button type="button" class="panel-tab" data-left="files">Dosyalar</button>
+      </nav>
+      <section class="panel-body" id="leftToc"></section>
+      <section class="panel-body hidden" id="leftFiles"></section>
+    </aside>
+
+    <main class="canvas-wrap" id="canvasWrap">
+      <div id="docBanner" class="doc-banner hidden"></div>
+      <div id="doc" class="report preview"></div>
+      <div id="canvasMsg" class="canvas-msg hidden"></div>
+    </main>
+
+    <!-- Yakınlaştırma: rapor alanının sağ alt köşesi · Ctrl + fare tekerleği · Ctrl + / Ctrl − / Ctrl 0 -->
+    <div class="zoom-float hidden" id="zoomFloat" role="toolbar" aria-label="Yakınlaştırma">
+      <button type="button" class="zf-btn" id="btnZoomOut" title="Uzaklaştır  (Ctrl −  ·  Ctrl + fare tekerleği)">−</button>
+      <button type="button" class="zf-val" id="zoomValue" title="Yakınlaştırma oranı: tıklayınca hazır oranlar">100%</button>
+      <button type="button" class="zf-btn" id="btnZoomIn" title="Yakınlaştır  (Ctrl +  ·  Ctrl + fare tekerleği)">+</button>
+      <span class="zf-sep"></span>
+      <button type="button" class="zf-btn" id="btnFitWidth" title="Genişliğe sığdır  (Ctrl 0)"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg></button>
+      <button type="button" class="zf-btn" id="btnFitPage" title="Sayfaya sığdır: bir sayfa ekrana tam sığar"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></button>
+      <div class="zf-menu hidden" id="zoomMenu"></div>
+    </div>
+
+    <aside class="right-panel">
+      <nav class="panel-tabs">
+        <button type="button" class="panel-tab active" data-right="sum">Özet</button>
+        <button type="button" class="panel-tab" data-right="checks">Kontrol <span id="checkBadge" class="badge hidden"></span></button>
+      </nav>
+      <section class="panel-body" id="rightSum"></section>
+      <section class="panel-body hidden" id="rightChecks"></section>
+    </aside>
+
+    <footer class="bottombar">
+      <span id="pageInfo"></span>
+      <span class="live" id="liveInfo"><i></i>md dosyaları değişince rapor kendiliğinden yenilenir</span>
+      <div class="tb-spacer"></div>
+      <span id="loadInfo"></span>
+      <span id="saveInfo"></span>
+      <span id="pathInfo"></span>
+    </footer>
+  </div>
+
+  <div id="studio" class="studio hidden"></div>
+  <div id="stage" class="report" aria-hidden="true"></div>
+  <div id="printRoot" class="report" aria-hidden="true"></div>
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="assets/fonts/fonts.js"></script>
+  <script src="assets/logos/logos.js"></script>
+  <script src="js/md.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/library.js"></script>
+  <script src="js/calc.js"></script>
+  <script src="js/thermal.js"></script>
+  <script src="js/texts.js"></script>
+  <script src="js/doc.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/covers.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/pdf-dom.js"></script>
+  <script src="js/github.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // PWA: https veya localhost'ta service worker (file:// kısayolunda çalışmaz, gerekmez)
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker kaydedilemedi', e)));
+    }
+  </script>
+</body>
+</html>

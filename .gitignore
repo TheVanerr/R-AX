@@ -1,0 +1,15 @@
+# Veriler ayrı depoda: TheVanerr/riskanalizix-veri (yerel çalışma kopyası: .veri.git, bkz. CLAUDE.md)
+/projects/
+/models/
+/.veri.git/
+
+# Bu bilgisayara özel kısayol; app/kisayol-olustur.cmd yeniden oluşturur
+/Risk Analizi.lnk
+
+# Şirket içi belge, API anahtarı içerir; herkese açık depoya girmez
+/Dolfin_QMS_Unified.html
+
+# Eski uygulama ve müşteri verili örnek proje dosyası: yalnız yerelde (test-donusum.mjs kullanır)
+/_eski/
+# Claude Code yerel ayarları
+/.claude/
