@@ -6,7 +6,8 @@
 'use strict';
 
 const SURUM = '__SURUM__';
-const CACHE = `risk-analizi-${SURUM}`;
+const ONEK = 'dolfin-rax-44cce8b4-'; // aynı kökende (thevanerr.github.io) başka projelerin önbellekleriyle karışmaz
+const CACHE = `${ONEK}${SURUM}`;
 const SHELL = [
   './',
   'index.html',
@@ -32,7 +33,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('risk-analizi-') && k !== CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith(ONEK) && k !== CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 

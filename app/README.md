@@ -49,6 +49,6 @@ Carlito ve Selawik (SIL OFL), semboller DejaVu Sans alt kümesi (`assets/fonts/L
 
 ## PWA ve GitHub Pages
 
-Uygulama kurulabilir bir PWA'dır: `manifest.webmanifest` (kimlik `/dolfin-cnk-rax-risk-analizi-5c1e7b92`; değiştirilirse kurulu uygulamalar ayrı uygulama sayılır), `sw.js` (uygulama kabuğunu ağ önce / önbellek yedek ile tutar; GitHub API, `__api/` ve `projects/` `models/` verileri önbelleğe girmez) ve `assets/pwa/` simgeleri (`python app/araclar/ikon-uret.py` üretir: kalkan içinde 3×3 risk matrisi).
+Uygulama kurulabilir bir PWA'dır: `manifest.webmanifest` (kimlik `./?pwa=dolfin-rax-risk-analizi-44cce8b4-4d1d-4fba-98c4-af3c1b3731f8`, start_url'e göre çözülür → `/R-AX/?pwa=…`; değiştirilirse kurulu uygulamalar ayrı uygulama sayılır), `sw.js` (uygulama kabuğunu ağ önce / önbellek yedek ile tutar; GitHub API, `__api/` ve `projects/` `models/` verileri önbelleğe girmez) ve `assets/pwa/` simgeleri (`python app/araclar/ikon-uret.py` üretir: kalkan içinde 3×3 risk matrisi).
 
 Yayın: `.github/workflows/pages.yml` — `main`'e `app/**` değişikliği gidince `app/` klasörünü (`araclar/`, `*.md`, kısayol betikleri hariç) GitHub Pages'e yükler ve `sw.js` içindeki `__SURUM__` değerini commit kimliğiyle değiştirir (her yayında önbellek yenilenir). Adres: `https://thevanerr.github.io/R-AX/`. Veriler yayına girmez; uygulama gizli veri deposuna kullanıcının kendi anahtarıyla bağlanır. Service worker yalnız https ve localhost'ta çalışır; `file://` kısayolu eskisi gibi açılır.
