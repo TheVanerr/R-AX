@@ -14,10 +14,10 @@ function safe(rel) {
   if (abs !== ROOT && !abs.startsWith(ROOT + path.sep)) throw new Error('kök dışı yol');
   return abs;
 }
-/** Silinebilir yollar: projects/ ve models/ altındaki dosya ve klasörler (kök, projects/, models/ kendisi değil) */
+/** Silinebilir yollar: projects/, models/ ve lvd/ altındaki dosya ve klasörler (kök ve bu klasörlerin kendisi değil) */
 function removable(abs) {
   const rel = path.relative(ROOT, abs).split(path.sep);
-  return ['projects', 'models'].includes(rel[0]) && rel.length >= 2 && !rel.includes('..');
+  return ['projects', 'models', 'lvd'].includes(rel[0]) && rel.length >= 2 && !rel.includes('..');
 }
 
 const server = http.createServer(async (req, res) => {
@@ -38,7 +38,7 @@ const server = http.createServer(async (req, res) => {
       if (op === 'stat') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify({ exists: fs.existsSync(abs) })); }
       if (op === 'mkdir' && req.method === 'POST') { fs.mkdirSync(abs, { recursive: true }); res.writeHead(200); return res.end(); }
       if (op === 'remove' && req.method === 'POST') {
-        if (!removable(abs)) { res.writeHead(403); return res.end('yalnız projects/ ve models/ altı silinebilir'); }
+        if (!removable(abs)) { res.writeHead(403); return res.end('yalnız projects/, models/ ve lvd/ altı silinebilir'); }
         fs.rmSync(abs, { recursive: true, force: true });
         res.writeHead(200);
         return res.end();

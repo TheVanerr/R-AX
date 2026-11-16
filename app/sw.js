@@ -14,6 +14,7 @@ const SHELL = [
   'manifest.webmanifest',
   'css/ui.css',
   'css/rapor.css',
+  'css/lvd.css',
   'assets/fonts/fonts.js',
   'assets/logos/logos.js',
   'assets/logos/dolfin.png',
@@ -24,7 +25,8 @@ const SHELL = [
   'assets/pwa/apple-touch-icon.png',
   'js/md.js', 'js/util.js', 'js/library.js', 'js/calc.js', 'js/thermal.js', 'js/texts.js', 'js/doc.js',
   'js/rules.js', 'js/covers.js', 'js/report.js', 'js/layout.js', 'js/pdf.js', 'js/pdf-dom.js',
-  'js/github.js', 'js/store.js', 'js/app.js'
+  'js/github.js', 'js/store.js', 'js/app.js',
+  'js/lvd-lib.js', 'js/lvd.js', 'js/lvd-report.js', 'js/lvd-app.js'
 ];
 
 self.addEventListener('install', (e) => {

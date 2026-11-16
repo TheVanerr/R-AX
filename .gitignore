@@ -1,6 +1,7 @@
 # Veriler ayrı depoda: TheVanerr/riskanalizix-veri (yerel çalışma kopyası: .veri.git, bkz. CLAUDE.md)
 /projects/
 /models/
+/lvd/
 /.veri.git/
 
 # Bu bilgisayara özel kısayol; app/kisayol-olustur.cmd yeniden oluşturur

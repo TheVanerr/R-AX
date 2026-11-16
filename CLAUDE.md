@@ -4,6 +4,7 @@ Dolfin (CNK Elektronik Makine San. A.Ş.) endüstriyel parça yıkama makineleri
 
 - md biçimi: [app/MD-SEMASI.md](app/MD-SEMASI.md) — yazmadan önce oku, birebir uy.
 - Kurallar ve eşikler: [app/KURALLAR.md](app/KURALLAR.md).
+- LVD test raporu (elektriksel güvenlik, EN 60204-1 Bölüm 18) biçimi: [app/LVD-SEMASI.md](app/LVD-SEMASI.md) — risk analizinden ayrı modül ve klasör (`lvd/`).
 - Tam örnek proje: `projects/0326066-KSYSTE-KBN 1B 1500/` · tam örnek model şablonu: `models/KBN/KBN 1B/`.
 
 ## İki depo
@@ -11,26 +12,26 @@ Dolfin (CNK Elektronik Makine San. A.Ş.) endüstriyel parça yıkama makineleri
 | Depo | İçerik | Yerel |
 |---|---|---|
 | `TheVanerr/R-AX` (herkese açık; uygulama GitHub Pages: https://thevanerr.github.io/R-AX/) | uygulama kodu, belgeler, `_eski/` — müşteri verisi eklenmez | `R&AX/.git` |
-| `TheVanerr/riskanalizix-veri` (özel olmalı) | **veritabanı**: `projects/`, `models/` | `R&AX/.veri.git` — çalışma ağacı R&AX kökü, yalnız `projects/` ve `models/` izlenir |
+| `TheVanerr/riskanalizix-veri` (özel olmalı) | **veritabanı**: `projects/`, `models/`, `lvd/` | `R&AX/.veri.git` — çalışma ağacı R&AX kökü, yalnız `projects/`, `models/` ve `lvd/` izlenir |
 
 Kullanıcı uygulamayı GitHub modunda kullanır: Ölçümler penceresi ve yeni rapor/proje doğrudan veri deposuna commit atar. Bu yüzden veri düzenlemeden **önce çek, bitince gönder** (komutlar R&AX kökünden):
 
 ```
 git --git-dir=.veri.git pull --rebase --autostash        # önce: uygulamadan gelen kayıtları al
-git --git-dir=.veri.git add -A -f -- projects models ':!*Thumbs.db' ':!*desktop.ini' ':!*.tmp' ':!*~$*'
+git --git-dir=.veri.git add -A -f -- projects models lvd ':!*Thumbs.db' ':!*desktop.ini' ':!*.tmp' ':!*~$*'
 git --git-dir=.veri.git commit -m "…"                    # sonra: değişikliği kaydet
 git --git-dir=.veri.git pull --rebase                    # arada uygulamadan kayıt geldiyse üstüne taşı
 git --git-dir=.veri.git push origin main                  # uygulama 15 sn içinde görür
 ```
 
-`add` için `-f` gerekir: kök `.gitignore` kod deposunu korumak için `projects/` ve `models/` klasörlerini dışlar ve veri deposu da aynı çalışma klasörünü kullanır. `.gitignore`'dan bu satırları silme. Eklemeden önce `add -n` (kuru çalıştırma) ile listeye bak.
+`add` için `-f` gerekir: kök `.gitignore` kod deposunu korumak için `projects/`, `models/` ve `lvd/` klasörlerini dışlar ve veri deposu da aynı çalışma klasörünü kullanır. `.gitignore`'dan bu satırları silme. Eklemeden önce `add -n` (kuru çalıştırma) ile listeye bak.
 
 Kullanıcı uygulamadan proje / makine raporu silebilir (onay: `TheVanerr/<klasör adı>` tam yazılır; commit "Silindi: <yol>"). Yanlışlıkla silineni geri getirmek için: `git --git-dir=.veri.git pull --rebase`, sonra `git --git-dir=.veri.git log --diff-filter=D --oneline -- "<yol>"` ile silme commit'ini bul, `git --git-dir=.veri.git checkout <commit>^ -- "<yol>"` ile geri al, ekle / commit / gönder.
 
 Göndermeden önce deponun gizli olduğunu doğrula — oturumsuz istek **404** dönmeli (200 = herkese açık, müşteri verisi gönderilmez):
 `curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/TheVanerr/riskanalizix-veri`
 
-Kod deposu `projects/` ve `models/` klasörlerini `.gitignore` ile dışarıda tutar. Bu yapıdan sonraki ilk kod commit'inde eski veri yolları izlemeden çıkarılmalı: `git rm -r --cached Models "0326066-KSYSTE-KBN 1B 1500 RISK ANALYSIS"` (yalnız kullanıcı commit isterse).
+Kod deposu `projects/`, `models/` ve `lvd/` klasörlerini `.gitignore` ile dışarıda tutar. Bu yapıdan sonraki ilk kod commit'inde eski veri yolları izlemeden çıkarılmalı: `git rm -r --cached Models "0326066-KSYSTE-KBN 1B 1500 RISK ANALYSIS"` (yalnız kullanıcı commit isterse).
 
 ## İş türleri
 
@@ -60,6 +61,17 @@ Kullanıcı rapor no, rev, tarih, hazırlayan / kontrol eden / onaylayan (unvanl
 
 Kullanıcı uygulamada yapar (**+ Yeni makine raporu** → Ölçümler → Yayınla). Değerleri Claude'a verirse `raporlar/<iş>/rapor.md` dosyasını Ölçümler penceresinin yazdığı biçimde yaz (`tur: birim`, `sablon rev: <modelin güncel değeri>`; `# Elektrik Testleri`, `# Gürültü`, `# Termografi`, `# Validasyon` yalnız değerlerle) ve fotoğrafları adlandırma kuralıyla alt klasörlere koy. Yayınlama (şablonu `sablon/` klasörüne dondurma) uygulamadan yapılır; elle `sablon/` oluşturma.
 
+### E) LVD test raporu (`lvd/`)
+
+Elektriksel güvenlik test raporu; EN 60204-1:2018 Bölüm 18 (§18.1 a–h: gözle kontrol, R<sub>PE</sub>, Test 2 / Z<sub>s</sub>, yalıtım direnci, gerilim testi, artık gerilim, koruma iletkeni akımı §8.2.6, fonksiyon testleri). Risk analizinden **ayrı**: `lvd/<iş no>-<MÜŞTERİ KISA>-<MODEL>/lvd.md` + `olcum/`, `foto/`, `kurulum/`, `cikti/`. LVD işinde risk analizi dosyalarına (`projects/`, `models/`) **yazılmaz**; gerekli veri `risk analizi:` bağlantısıyla okunur ve LVD klasörüne kopyalanır.
+
+1. Kullanıcı raporu çoğunlukla uygulamada açar (ana ekran **LVD Testleri** ya da risk analizinde **LVD** düğmesi) ve fotoğrafları toplu bırakır. Claude'a değer okumayı bırakırsa: çek, `lvd.md`'yi [app/LVD-SEMASI.md](app/LVD-SEMASI.md) biçiminde düzenle.
+2. Ölçüm fotoğraflarına bakarak ekrandaki değeri ve saati oku (`PE 1`, `L1-PE ISO`, `L1-PE FLASH`, `KACAK 1`, `ARTIK 1`, `ZS 1`); kullanıcının verdiği değerle çelişirse sor. Etiket / pano fotoğraflarından makine ve besleme bilgilerini (gerilim, akım, kısa devre dayanımı, IP) oku.
+3. Gözle kontrol (G-01 … G-25) ve fonksiyon testlerini (F-xx) **kanıtsız U yapma**: fotoğrafta görülen ya da kullanıcının söylediği kadarını işaretle, gerisini boş bırakıp sor. Yapılmayan test için `- durum:` (kurulum yerinde / uygulanamaz / yapılmadı) yaz.
+4. Test cihazı seri no ve kalibrasyon geçerliliği eksikse sor (geçerlilik test tarihinden önce bitmişse hata).
+5. Üç dil: `diller: tr, en, de` ise not, açıklama, nokta metinleri TR | EN | DE.
+6. Kontrol: `node app/araclar/lvd-kontrol.mjs "lvd/<klasör>"` (hata 0 olmalı); özetle: genel sonuç, a–h durumları, açık noktalar.
+
 ## Kusursuz analiz için kontrol listesi
 
 - **Tehlike tanımlama:** EN ISO 12100 Tablo B.1'in on grubunun her biri (mekanik, elektrik, termal, gürültü, titreşim, radyasyon, malzeme/madde, ergonomi, kullanım ortamı, kombinasyon) ya en az bir tehlikeyle ya da `## Uygulanamaz` altında gerekçeyle karşılanır. Yaşam döngüsü fazları: taşıma, kurulum, devreye alma, çalışma, temizlik, bakım, arıza giderme, devreden çıkarma. Öngörülebilir kötüye kullanım (koruyucuyu köprüleme, sıcak yüzeye temas, yanlış kimyasal) ayrıca değerlendirilir. Başlangıç noktası: `app/js/library.js` tehlikeleri.
@@ -77,6 +89,7 @@ Kullanıcı uygulamada yapar (**+ Yeni makine raporu** → Ölçümler → Yayı
 
 ```
 node app/araclar/kontrol.mjs "projects/<klasör>"        # hata 0 olmalı; uyarıları tek tek değerlendir
+node app/araclar/lvd-kontrol.mjs "lvd/<klasör>"         # LVD raporu için (hata 0 olmalı)
 node app/araclar/sunucu.mjs                              # görsel kontrol için (arka planda)
 node app/araclar/test-tarayici.mjs "projects/<klasör>" <scratchpad> --sayfa 1,11,25 --pdf tr
 ```

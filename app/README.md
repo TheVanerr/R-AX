@@ -25,14 +25,19 @@ md dosyaları ──► md.js ──► doc.js ──► rules.js ──► repo
 | `github.js` | GitHub deposu veritabanı olarak (P&PX yöntemi): ağaç, blob, tek commit'te çok dosya, "yalnız ileri" dal başı; herkese açık depo reddedilir |
 | `store.js` | depo arayüzü, üç arka uç: **GitHub** (önerilen; ağaç bellekte, dosyalar kimliğine göre IndexedDB önbelleğinde, yazmalar 0,4 sn toplanıp tek commit, depo 15 sn'de bir denetlenir), **klasör** (File System Access), **HTTP** (yerel sunucu) |
 | `app.js` | arayüz: klasör izni, ana ekran, model seçici, görüntüleyici, canlı yenileme, PDF, kapak ve ölçüm stüdyoları. Rapor fotoğrafları beklemeden çizilir (gri yer tutucu), fotoğraflar 12 paralel iner ve yerine oturur; PDF öncesi hepsi tamamlanır. Makine raporu: taslak → **Yayınla** (şablon `sablon/` klasörüne dondurulur) → **Güncel şablonla yeni revizyon**. Üst çubuk (kapak / antet bilgileri): yazarken kapak ve antetler yeniden dizilmeden güncellenir, alandan çıkınca md'ye yazılır (`RaDoc.setFront`, `RaDoc.editRevisions`). Rapor silme: Dosyalar sekmesi → Tehlikeli bölge; düğme `<sahip>/<klasör adı>` harfi harfine yazılınca açılır (yalnız `projects/<ad>` ve `models/…/raporlar/<ad>`; yerel sunucu da yalnız `projects/` ve `models/` altını siler) |
+| `lvd-lib.js` | **LVD test raporu** — EN 60204-1 Bölüm 18 yapısı: §18.1 test programı a–h (zorunlu a, b, h), gözle kontrol maddeleri G-01…G-25 (madde numaralarıyla), fonksiyon testleri F-01…F-07, varsayılan kabul kriterleri, fotoğraf ad kuralı, rapor metinleri (TR / EN / DE) |
+| `lvd.js` | LVD: `lvd.md` ↔ veri modeli (okuma, yazma; tanınmayan bölümler korunur), değerlendirme (durumlar, genel sonuç, kontrol listesi), risk analizinden aktarım (`importRA`: yalnız boş alanlar, fotoğraflar kopyalanır) — [LVD-SEMASI.md](LVD-SEMASI.md) |
+| `lvd-report.js` | LVD rapor sayfaları: Kırmızı Bant kapağı, revizyon / içindekiler, 1–9 ve Ek A (ölçüm ekranları), Ek B (makine ve kurulum); sayfalama `RaLayout.paginate` ile |
+| `lvd-app.js` | LVD arayüzü: risk analizi ekranının üstünde açılan katman (`#lvd`). Ana ekrana **LVD Testleri** sekmesi, rapor çubuğuna **LVD** düğmesi ekler (risk analizi kodu değişmez). Liste, görüntüleyici, veri penceresi (Genel · Test cihazları · Gözle kontrol · Ölçümler · Fonksiyon testleri · Fotoğraflar), toplu fotoğraf yükleme (ad kuralı, EXIF saati, kurala uymayanı teste atama), PDF, silme. `?lvd=<klasör>` ile doğrudan açılır |
 
-`md.js`, `doc.js`, `library.js`, `calc.js`, `rules.js`, `thermal.js`, `texts.js`, `covers.js`, `report.js` DOM'a bağlı değildir; Node'da da çalışır.
+`md.js`, `doc.js`, `library.js`, `calc.js`, `rules.js`, `thermal.js`, `texts.js`, `covers.js`, `report.js`, `lvd-lib.js`, `lvd.js` DOM'a bağlı değildir; Node'da da çalışır.
 
 ## Araçlar (`araclar/`)
 
 | Komut | Ne yapar |
 |---|---|
 | `node app/araclar/kontrol.mjs "<klasör>"` | belgeyi okur, kuralları çalıştırır, özet ve kontrol listesini yazar (`--json`) |
+| `node app/araclar/lvd-kontrol.mjs "lvd/<klasör>"` | LVD test raporunu okur, EN 60204-1 §18.1 programına göre değerlendirir, özet ve kontrol listesini yazar (`--json`) |
 | `node app/araclar/termal-incele.mjs <klasör> --cikti <klasör>` | `.bmt` dosyalarının min/maks, en sıcak nokta, ızgara değerleri; termal önizleme ve gerçek görüntü |
 | `node app/araclar/sunucu.mjs [port]` | R&AX'i `http://localhost:8765/app/` adresinde sunar (izin istemeden açılış, test) |
 | `node app/araclar/test-tarayici.mjs "<klasör>" <çıktı> --sayfa 1,2 --pdf tr+en+de --ekran ana,belge,olcum,kapak` | başsız Edge ile ekran görüntüsü ve PDF (sunucu açık olmalı) |
@@ -46,6 +51,16 @@ md dosyaları ──► md.js ──► doc.js ──► rules.js ──► repo
 ## Yazı tipleri ve lisanslar
 
 Carlito ve Selawik (SIL OFL), semboller DejaVu Sans alt kümesi (`assets/fonts/LICENSE-DejaVu.txt`). Rapor ekranda ve PDF'te aynı yazı tipleriyle dizilir; bilgisayarda yüklü yazı tiplerine bağlı değildir.
+
+## LVD test raporu (elektriksel güvenlik)
+
+Risk analizinden ayrı bir rapor türüdür; veriler `lvd/<iş no>-<MÜŞTERİ>-<MODEL>/` klasöründe durur (biçim: [LVD-SEMASI.md](LVD-SEMASI.md)). Risk analizi kodu ve `projects/`, `models/` dosyaları değişmez; LVD modülleri yalnız okur.
+
+- **Açmak:** ana ekranda **LVD Testleri** sekmesi ya da bir risk analizi açıkken üst çubukta **LVD** (bağlı rapor varsa açılır, yoksa o risk analizinden oluşturulur).
+- **Bağlantı:** `risk analizi: <klasör>`. **Risk analizinden aktar**: makine tipi ve besleme, test tarihi / yeri / test eden / yöntem, cihaz, R<sub>PE</sub> · R<sub>ISO</sub> · HV değerleri ve ölçüm fotoğrafları, genel / panel / kurulum fotoğrafları yalnız boş alanlara kopyalanır. Güvenlik fonksiyonu validasyonu risk analizinde kalır (atıf yapılır).
+- **Fotoğraflar:** toplu bırakılır; `PE 1`, `L1-PE ISO`, `L1-PE FLASH`, `KACAK 1`, `ARTIK 1`, `ZS 1`, `ETIKET`, `PANO`, `GENEL`, `KURULUM` adları kendi satırına / türüne bağlanır; ölçüm saati boşsa EXIF çekim saatinden dolar; kurala uymayan ad listeden teste atanır.
+- **Değerlendirme:** a–h her biri uygun / uygun değil / açık / yapılmadı / kurulum yerinde / koşullu; genel sonuç ve kontrol listesi sağ panelde ve `lvd-kontrol.mjs` çıktısında.
+- **Depo:** GitHub modunda her kayıt bir commit'tir (fotoğraf kopyaları yeniden yüklenmez, depodaki dosya kimliği kullanılır). Kod deposu `.gitignore` ile `lvd/` klasörünü dışlar; LVD verileri veri deposundadır.
 
 ## PWA ve GitHub Pages
 
