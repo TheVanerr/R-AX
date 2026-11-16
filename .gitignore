@@ -14,3 +14,6 @@
 /_eski/
 # Claude Code yerel ayarları
 /.claude/
+
+# Kök klasöre konan örnek / kaynak PDF dosyaları (ör. müşteri raporları) herkese açık kod deposuna girmez
+/*.pdf

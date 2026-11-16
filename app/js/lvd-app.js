@@ -21,9 +21,9 @@
   const isMd = (name) => /\.md$/i.test(name) && !/^readme/i.test(name);
   const STATE = { pass: ['green', 'uygun'], fail: ['red', 'uygun değil'], open: ['amber', 'açık'], none: ['gray', 'yapılmadı'], na: ['gray', 'uygulanamaz'], site: ['amber', 'kurulum yerinde'], skip: ['gray', 'yapılmadı'], warn: ['amber', 'koşullu'] };
   const OVERALL = { pass: ['green', 'Uygun'], fail: ['red', 'Uygun değil'], open: ['amber', 'Açık'], cond: ['amber', 'Koşullu'] };
-  const SHORT = { visual: 'Gözle kontrol', rpe: 'R<sub>PE</sub> (Test 1)', loop: 'Z<sub>s</sub> (Test 2)', iso: 'Yalıtım direnci', hv: 'Gerilim testi', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı', func: 'Fonksiyon testleri' };
-  const ROWNAME = { rpe: 'R_PE', loop: 'Zs', iso: 'ISO', hv: 'HV', res: 'Artık', leak: 'I_PE' };
-  const UNIT = { rpe: 'Ω', loop: 'Ω', iso: 'MΩ', hv: 'mA', res: 'V', leak: 'mA' };
+  const SHORT = { visual: 'Gözle kontrol', rpe: 'R<sub>PE</sub> (Test 1)', vd: 'Gerilim düşümü (≈10 A)', loop: 'Z<sub>s</sub> (Test 2)', iso: 'Yalıtım direnci', hv: 'Gerilim testi (Hi-Pot)', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı', func: 'Fonksiyon testleri', pwr: 'Çalışma testi (aktif)' };
+  const ROWNAME = { rpe: 'R_PE', vd: 'ΔU', loop: 'Zs', iso: 'ISO', hv: 'HV', res: 'Artık', leak: 'I_PE', pwr: 'Güç' };
+  const UNIT = { rpe: 'Ω', vd: 'V', loop: 'Ω', iso: 'MΩ', hv: 'mA', res: 'V', leak: 'mA', pwr: 'V' };
   const DEVICES = [
     L3('Elektriksel güvenlik test cihazı', 'Electrical safety tester', 'Prüfgerät für elektrische Sicherheit'),
     L3('Döngü empedansı test cihazı', 'Loop impedance tester', 'Schleifenimpedanz-Messgerät'),
@@ -127,6 +127,7 @@
     for (const k of LIB.MEAS) m.meas[k].rows.forEach((r) => r.photo && out.add(r.photo));
     m.visual.forEach((v) => v.photo && out.add(v.photo));
     m.photos.forEach((p) => out.add(p.file));
+    Object.values(m.meta.signs || {}).forEach((f) => f && out.add(f));
     return [...out].filter((p) => S.fileSig[p] !== undefined);
   }
 
@@ -739,6 +740,8 @@
   }
   function newRow(test, tag) {
     if (test === 'loop') return { tag, time: '', circuit: L3(''), device: '', zs: '', zsMax: '', photo: null };
+    if (test === 'vd') return { tag, time: '', cs: '', i: '', value: '', lim: '', point: L3(''), photo: null };
+    if (test === 'pwr') return { tag, time: '', u: '', i: '', pf: '', p: '', s: '', q: '', point: L3(''), photo: null };
     const r = { tag, time: '', value: '', point: (test === 'iso' || test === 'hv') && LIB.pairText(tag) ? LIB.pairText(tag) : L3(''), photo: null };
     if (test === 'hv') r.u = '';
     if (test === 'res') r.t = '';
@@ -794,7 +797,7 @@
       const L = W.limits;
       $('lsSide').innerHTML = `<div class="sum-card"><h3>Anlık sonuç</h3><div class="sum-row"><span>Genel</span><span class="v">${chip(c, t)}</span></div>
         ${LIB.TESTS.map((x) => `<div class="sum-row"><span><b>${x.letter})</b> ${SHORT[x.key]}</span><span class="v">${stateChip(ev.tests[x.key].state, x.req)}</span></div>`).join('')}</div>
-        <div class="hint">Kabul: R<sub>PE</sub> ≤ ${decStr(L.rpeMax)} Ω · R<sub>ISO</sub> ≥ ${decStr(L.isoMin)} MΩ · HV ≤ ${decStr(L.hvMax)} mA · I<sub>PE</sub> ≤ ${decStr(L.leakMax)} mA · artık gerilim ≤ ${decStr(L.resMax)} V / ${decStr(L.resT)} s · Z<sub>s</sub> ≤ U<sub>0</sub> / I<sub>a</sub></div>
+        <div class="hint">Kabul: R<sub>PE</sub> ≤ ${decStr(L.rpeMax)} Ω (I ≥ ${decStr(L.rpeI)} A) · R<sub>ISO</sub> ≥ ${decStr(L.isoMin)} MΩ (${decStr(L.isoU)} ±${decStr(L.isoTol)} V) · HV ≤ ${decStr(L.hvMax)} mA (${decStr(L.hvU)} ±${decStr(L.hvTol)} V) · I<sub>PE</sub> ≤ ${decStr(L.leakMax)} mA · artık gerilim ≤ ${decStr(L.resMax)} V / ${decStr(L.resT)} s · Z<sub>s</sub> ≤ U<sub>0</sub> / I<sub>a</sub> · ΔU ≤ sınır · çalışma testi U<sub>n</sub> ±${decStr(L.uTol)} %</div>
         <div class="hint"><b>a)</b>, <b>b)</b> ve <b>h)</b> zorunludur (EN 60204-1 §18.1); diğerleri uygulanabildiği ölçüde yapılır. Yapılmayan test için Ölçümler'de durum seçin (kurulum yerinde / uygulanamaz / yapılmadı).</div>
         <div class="hint">Kaydet'e basınca <b>lvd.md</b> yazılır ve rapor yeniden oluşur.${store.mode === 'github' ? ' GitHub\'da her kayıt bir commit\'tir.' : ''}</div>
         ${ev.checks.filter((x) => x.level !== 'info').slice(0, 8).map((x) => `<div class="check-row"><span class="check-dot ${x.level}"></span><span>${esc(x.msg)}</span></div>`).join('')}`;
@@ -811,12 +814,14 @@
     const E = (root.RaApp && root.RaApp.state.entries) || { projects: [], units: [] };
     const raOpts = [['', '— bağlantı yok —'], ...E.projects.filter((e) => !e.empty).map((e) => [e.path, `Proje · ${raLabel(e)}`]), ...E.units.map((e) => [e.path, `Makine raporu · ${raLabel(e)}`])];
     if (M.link && !raOpts.some(([v]) => v === M.link)) raOpts.push([M.link, M.link]);
-    const lim = [['rpeI', 'R<sub>PE</sub> test akımı (A)'], ['rpeT', 'R<sub>PE</sub> süre (s)'], ['rpeMax', 'R<sub>PE</sub> sınır (Ω)'], ['isoU', 'R<sub>ISO</sub> gerilim (V DC)'], ['isoT', 'R<sub>ISO</sub> süre (s)'], ['isoMin', 'R<sub>ISO</sub> en az (MΩ)'], ['hvU', 'HV gerilim (V AC)'], ['hvT', 'HV süre (s)'], ['hvMax', 'HV kaçak akım sınırı (mA)'], ['leakMax', 'I<sub>PE</sub> sınırı (mA)'], ['resMax', 'Artık gerilim (V)'], ['resT', 'Artık gerilim süresi (s)'], ['u0', 'U<sub>0</sub> faz–nötr (V)']];
+    const lim = [['rpeI', 'R<sub>PE</sub> test akımı, en az (A)'], ['rpeT', 'R<sub>PE</sub> süre (s)'], ['rpeMax', 'R<sub>PE</sub> sınır (Ω)'], ['isoU', 'R<sub>ISO</sub> gerilim (V DC)'], ['isoTol', 'R<sub>ISO</sub> gerilim toleransı (± V)'], ['isoT', 'R<sub>ISO</sub> süre (s)'], ['isoMin', 'R<sub>ISO</sub> en az (MΩ)'], ['hvU', 'HV gerilim (V AC)'], ['hvTol', 'HV gerilim toleransı (± V)'], ['hvT', 'HV süre (s)'], ['hvMax', 'HV kaçak akım sınırı (mA)'], ['leakMax', 'I<sub>PE</sub> sınırı (mA)'], ['resMax', 'Artık gerilim (V)'], ['resT', 'Artık gerilim süresi (s)'], ['u0', 'U<sub>0</sub> faz–nötr (V)'], ['uTol', 'Çalışma testi: gerilim sapması (± %)']];
+    const sig = (k, label) => { const f = (M.signs || {})[k]; const src = f ? ctx.img(f) : ''; return `<div class="field lv-sigf"><label>${label}</label><div class="lv-sigrow"><label class="ms-up" title="${src ? 'İmza görselini değiştir' : 'İmza görseli yükle (PNG, saydam zemin önerilir)'}">${src ? `<img class="thumb lv-sigimg" src="${src}" alt="">` : '<div class="nothumb">+ imza</div>'}<input type="file" accept="image/png,image/jpeg" data-up="sign.${k}" hidden></label>${f ? `<button type="button" class="icon-btn" data-act="del-sign" data-k="${k}" title="İmza görselini kaldır">×</button>` : ''}</div></div>`; };
     return `
       <div class="ms-card"><h3>Rapor bilgileri <small>kapak, antet ve onay</small></h3><div class="ms-grid">
         ${field('İş no', inp('meta.job', M.job))}${field('Müşteri', inp('meta.customer', M.customer))}${field('Model', inp('meta.model', M.model))}${field('Makine seri no', inp('meta.serial', M.serial, '', 'boşsa iş no'))}${field('İmal yılı', inp('meta.year', M.year))}
         ${field('Rapor no', inp('meta.docNo', M.docNo))}${field('Rev', inp('meta.rev', M.rev))}${field('Rapor tarihi', inp('meta.reportDate', M.reportDate, '', 'GG.AA.YYYY'))}${field('Durum', sel('meta.status', M.status, [['draft', 'Taslak'], ['final', 'Yayın']]))}${field('Diller', inp('meta.langsStr', (M.langs || []).join(', '), '', 'tr, en, de'))}
         ${field('Hazırlayan', inp('meta.approvals.prepared', A.prepared))}${field('Kontrol eden', inp('meta.approvals.checked', A.checked))}${field('Onaylayan', inp('meta.approvals.approved', A.approved))}
+        ${sig('prepared', 'İmza — hazırlayan')}${sig('checked', 'İmza — kontrol eden')}${sig('approved', 'İmza — onaylayan')}
       </div></div>
       <div class="ms-card"><h3>Risk analizi bağlantısı <small>yalnız okunur · aktarım yalnız boş alanları doldurur</small></h3>
         <div class="lv-row">${sel('meta.link', M.link, raOpts)}<button type="button" class="btn btn-sm" data-act="import"${M.link ? '' : ' disabled'}>Risk analizinden aktar</button></div>
@@ -834,7 +839,7 @@
         ${field('Besleme bağlantısı (TR | EN | DE)', mlInp('machine.connection', C.connection, '', 'CEE 32 A 5 kutuplu fiş | CEE 32 A 5-pin plug | CEE-Stecker 32 A 5-polig'), true)}
       </div><datalist id="lvNet"><option>TN-S</option><option>TN-C-S</option><option>TN-C</option><option>TT</option><option>IT</option></datalist></div>
       <div class="ms-card"><h3>Test koşulları</h3><div class="ms-grid">
-        ${field('Test tarihi', inp('cond.date', K.date, '', 'GG.AA.YYYY'))}${field('Saat', inp('cond.time', K.time, '', '15:40 – 16:25'))}${field('Ortam koşulları', inp('cond.ambient', K.ambient, '', '22 °C · %45 bağıl nem'))}${field('Test eden', inp('cond.testedBy', K.testedBy))}
+        ${field('Test tarihi', inp('cond.date', K.date, '', 'GG.AA.YYYY'))}${field('Saat', inp('cond.time', K.time, '', '15:40 – 16:25'))}${field('Ortam sıcaklığı', inp('cond.temp', K.temp, '', '23 ±2 °C'))}${field('Bağıl nem', inp('cond.hum', K.hum, '', '%55 ±10'))}${field('Test eden', inp('cond.testedBy', K.testedBy))}${field('Diğer ortam notu', inp('cond.ambient', K.ambient, '', 'iklimlendirilmiş üretim alanı'))}
         ${field('Test yeri (TR | EN | DE)', mlInp('cond.location', K.location, '', 'Üretim atölyesi | Production workshop | Fertigungshalle'), true)}
         ${field('Bağlantı (TR | EN | DE)', mlInp('cond.connection', K.connection), true)}
       </div><div class="field" style="margin-top:10px"><label>Yöntem (raporda not olarak)</label>${ml3('cond.method', K.method, 3)}</div></div>
@@ -867,37 +872,46 @@
   };
   PANES.olcum = () => {
     const ev = LVD.evaluate(W).tests;
+    const ref = LVD.pwrRef(W);
+    // Sütunlar: [alan, başlık, tür (pt: çok dilli açıklama · time · val · s), yer tutucu]
+    const FIELDS = {
+      rpe: [['point', 'Ölçüm noktası (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['i', 'I ölçülen (A)', 's', '0,229'], ['u', 'U ölçülen (V)', 's', '0,013'], ['value', 'R<sub>PE</sub> (Ω)', 'val', '0,06']],
+      vd: [['point', 'Ölçüm noktası (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['cs', 'Kesit (mm²)', 's', '2,5'], ['i', 'I (A)', 's', '10'], ['value', 'ΔU (V)', 'val', '0,66'], ['lim', 'Sınır (V)', 'val', 'auto']],
+      loop: [['circuit', 'Devre (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['device', 'Koruma', 's', 'C16'], ['zs', 'Z<sub>s</sub> (Ω)', 'val', '0,45'], ['zsMax', 'Z<sub>s,max</sub> (Ω)', 'val', 'auto']],
+      iso: [['point', 'Ölçülen devre (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['u', 'U ölçülen (V DC)', 's', String(W.limits.isoU)], ['value', 'R<sub>ISO</sub> (MΩ)', 'val', '>599,9']],
+      hv: [['point', 'Ölçülen devre (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['u', 'U ölçülen (V AC)', 's', String(W.limits.hvU)], ['value', 'I (mA)', 'val', '0,50']],
+      res: [['point', 'Ölçüm noktası (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['t', 'Süre (s)', 's', '5'], ['value', 'U (V)', 'val', '12']],
+      leak: [['point', 'Ölçüm (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['value', 'I<sub>PE</sub> (mA)', 'val', '1,2']],
+      pwr: [['point', 'Çalışma durumu (TR | EN | DE)', 'pt'], ['time', 'Saat', 'time'], ['u', 'U (V)', 's', '386'], ['i', 'I (A)', 's', '15,95'], ['pf', 'cos φ', 's', '0,98'], ['p', 'P (kW)', 's', '10,45'], ['s', 'S (kVA)', 's', '10,66'], ['q', 'Q (kVAR)', 's', '2,12']]
+    };
+    const HINT = { rpe: 'PE 1.jpg', vd: 'VD 1.jpg', loop: 'ZS 1.jpg', iso: 'L1-PE ISO.jpg', hv: 'L1-PE FLASH.jpg', res: 'ARTIK 1.jpg', leak: 'KACAK 1.jpg', pwr: 'GUC 1.jpg' };
     const card = (k) => {
       const t = LIB.TESTS.find((x) => x.key === k);
       const sec = W.meas[k];
       const T = ev[k];
+      const F = FIELDS[k];
       const statusSel = sel(`meas.${k}.status`, sec.status, [['', 'yapıldı / değer girilecek'], ['site', 'kurulum yerinde'], ['na', 'uygulanamaz'], ['skip', 'yapılmadı']], 'lv-status');
       const evc = (x) => (x.ok == null ? '<span class="chip gray">—</span>' : x.ok ? chip('green', '✓') : k === 'leak' ? chip('amber', '!') : chip('red', '✗'));
-      const cols = {
-        rpe: ['No', 'Ölçüm noktası (TR | EN | DE)', 'Saat', 'Değer (Ω)'],
-        iso: ['Çift', 'Ölçülen devre (TR | EN | DE)', 'Saat', 'Değer (MΩ)'],
-        hv: ['Çift', 'Ölçülen devre (TR | EN | DE)', 'Saat', 'U (V)', 'Değer (mA)'],
-        res: ['No', 'Ölçüm noktası (TR | EN | DE)', 'Saat', 'Süre (s)', 'Değer (V)'],
-        leak: ['No', 'Ölçüm (TR | EN | DE)', 'Saat', 'Değer (mA)'],
-        loop: ['No', 'Devre (TR | EN | DE)', 'Saat', 'Koruma', 'Z<sub>s</sub> (Ω)', 'Z<sub>s,max</sub>']
-      }[k];
-      const ph = { rpe: '0,05', iso: '>599,9', hv: '0,50', res: '12', leak: '1,2', loop: '0,45' }[k];
       const rows = sec.rows.map((r, i) => {
         const x = T.rows[i];
         const b = `meas.${k}.rows.${i}`;
-        const cells = [`<td>${inp(`${b}.tag`, r.tag, 'w-tag')}</td>`, `<td>${mlInp(`${b}.${k === 'loop' ? 'circuit' : 'point'}`, k === 'loop' ? r.circuit : r.point, 'lv-w-pt')}</td>`, `<td>${inp(`${b}.time`, r.time, 'w-time', '15:43:14')}</td>`];
-        if (k === 'hv') cells.push(`<td>${inp(`${b}.u`, r.u, 'w-val', String(W.limits.hvU))}</td>`);
-        if (k === 'res') cells.push(`<td>${inp(`${b}.t`, r.t, 'lv-w-s', '5')}</td>`);
-        if (k === 'loop') cells.push(`<td>${inp(`${b}.device`, r.device, 'lv-w-s', 'C16')}</td>`, `<td>${inp(`${b}.zs`, r.zs, 'w-val', ph)}</td>`, `<td>${inp(`${b}.zsMax`, r.zsMax, 'w-val', x && x.lim != null ? decStr(x.lim) : 'otomatik')}</td>`);
-        else cells.push(`<td>${inp(`${b}.value`, r.value, 'w-val', ph)}</td>`);
+        const cells = [`<td>${inp(`${b}.tag`, r.tag, 'w-tag')}</td>`];
+        for (const [f, , type, ph] of F) {
+          if (type === 'pt') cells.push(`<td>${mlInp(`${b}.${f}`, r[f], 'lv-w-pt')}</td>`);
+          else if (type === 'time') cells.push(`<td>${inp(`${b}.time`, r.time, 'w-time', '15:43:14')}</td>`);
+          else cells.push(`<td>${inp(`${b}.${f}`, r[f], type === 'val' ? 'w-val' : 'lv-w-s', ph === 'auto' ? (x && x.lim != null ? decStr(x.lim) : 'otomatik') : ph)}</td>`);
+        }
         cells.push(`<td class="lv-ev" data-ev="${k}.${i}">${x ? evc(x) : ''}</td>`, `<td>${thumb(r.photo, `meas.${k}.${i}`)}</td>`, `<td><button type="button" class="icon-btn" data-act="del-row" data-test="${k}" data-i="${i}" title="Satırı sil">×</button></td>`);
         return `<tr>${cells.join('')}</tr>`;
-      }).join('') || `<tr><td colspan="${cols.length + 3}" class="desc">Satır yok. "+ Satır" ile ekleyin ya da Fotoğraflar sekmesine ${k === 'loop' ? '<b>ZS 1.jpg</b>' : k === 'leak' ? '<b>KACAK 1.jpg</b>' : k === 'res' ? '<b>ARTIK 1.jpg</b>' : k === 'rpe' ? '<b>PE 1.jpg</b>' : `<b>L1-PE ${k === 'iso' ? 'ISO' : 'FLASH'}.jpg</b>`} adlı fotoğraf bırakın.</td></tr>`;
-      return `<div class="ms-card" id="ls-${k}"><h3><span>${t.letter}) ${esc(t.name.tr)} <small>${esc(t.clause)}${t.req ? ' · zorunlu' : ''}</small></span><span class="lv-hd">${statusSel}${stateChip(T.state, t.req)}</span></h3>
-        <table class="ms-table"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}<th>Değ.</th><th>Foto</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-        <div class="ms-uprow"><button type="button" class="btn btn-sm" data-act="add-row" data-test="${k}">+ Satır</button>${k === 'iso' || k === 'hv' ? `<button type="button" class="btn btn-sm" data-act="add-pairs" data-test="${k}">+ 10 iletken çifti (3N+PE)</button>` : ''}<div class="field lv-note">${mlInp(`meas.${k}.note`, sec.note, '', 'not (raporda tablonun altında)')}</div></div></div>`;
+      }).join('') || `<tr><td colspan="${F.length + 4}" class="desc">Satır yok. "+ Satır" ile ekleyin ya da Fotoğraflar sekmesine <b>${HINT[k]}</b> adlı fotoğraf bırakın.</td></tr>`;
+      const extra = k === 'pwr' ? `<div class="field lv-un"><label>Nominal gerilim (V)</label>${inp('meas.pwr.un', sec.un, 'w-val', ref.un ? String(ref.un) : '400')}</div>` : '';
+      const tip = { rpe: 'I / U ölçülen: test cihazının gösterdiği test akımı ve gerilimi (isteğe bağlı; I ≥ en az test akımı olmalı).', vd: 'Sınır boşsa kesit (≥ 1 mm²) ve test akımından EN 60204-1:2006 Tablo 9\'a göre hesaplanır.', iso: 'U ölçülen: uygulanan test gerilimi (isteğe bağlı; tolerans Genel sekmesinde).', hv: 'U ölçülen: uygulanan test gerilimi (tolerans Genel sekmesinde).', pwr: `Sapma nominal gerilime göre hesaplanır (±${decStr(W.limits.uTol)} %); akım, Makine'deki anma akımıyla${ref.irated ? ` (${decStr(ref.irated)} A)` : ''} karşılaştırılır.` }[k];
+      return `<div class="ms-card" id="ls-${k}"><h3><span>${t.letter === '+' ? '' : `${t.letter}) `}${esc(t.name.tr)} <small>${esc(t.clause)}${t.req ? ' · zorunlu' : t.extra ? ' · ek test' : ''} · ${t.mode === 'on' ? 'aktif (enerjili)' : 'pasif (enerjisiz)'}</small></span><span class="lv-hd">${statusSel}${stateChip(T.state, t.req)}</span></h3>
+        ${tip ? `<div class="hint" style="margin:-4px 0 8px">${tip}</div>` : ''}
+        <table class="ms-table"><thead><tr><th>${k === 'iso' || k === 'hv' ? 'Çift' : 'No'}</th>${F.map(([, h]) => `<th>${h}</th>`).join('')}<th>Değ.</th><th>Foto</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+        <div class="ms-uprow"><button type="button" class="btn btn-sm" data-act="add-row" data-test="${k}">+ Satır</button>${k === 'iso' || k === 'hv' ? `<button type="button" class="btn btn-sm" data-act="add-pairs" data-test="${k}">+ 10 iletken çifti (3N+PE)</button>` : ''}${extra}<div class="field lv-note">${mlInp(`meas.${k}.note`, sec.note, '', 'not (raporda tablonun altında)')}</div></div></div>`;
     };
-    return `<div class="hint">Satırlar fotoğraf adlarıyla da açılır (Fotoğraflar sekmesi). Değer biçimi: <b>0,06</b> · <b>&gt;599,9</b> · ölçüm saati boşsa fotoğrafın çekilme saatinden doldurulur. Sınırlar Genel sekmesinde.</div>${LIB.MEAS.map(card).join('')}`;
+    return `<div class="hint">Satırlar fotoğraf adlarıyla da açılır (Fotoğraflar sekmesi). Değer biçimi: <b>0,06</b> · <b>&gt;599,9</b> · ölçüm saati boşsa fotoğrafın çekilme saatinden doldurulur. Sınırlar ve toleranslar Genel sekmesinde.</div>${LIB.MEAS.map(card).join('')}`;
   };
   PANES.fonk = () => {
     const lib = Object.fromEntries(LIB.FUNC.map((f) => [f.id, f]));
@@ -1008,6 +1022,17 @@
     const ops = [];
     try {
       if (kind === 'meas') await putRowPhoto(a, W.meas[a].rows[+b], files[0], ops);
+      else if (kind === 'sign') {
+        // İmza görseli: PNG saydamlığı korunur (küçültülmez), JPEG küçültülür
+        const f = files[0];
+        const png = /png/i.test(f.type) || /\.png$/i.test(f.name);
+        const dst = `${W.dir}/imza/${a}.${png ? 'png' : 'jpg'}`;
+        const old = (W.meta.signs || {})[a];
+        if (old && old !== dst && old.startsWith(`${W.dir}/`)) ops.push(store.remove(old));
+        W.meta.signs = W.meta.signs || {};
+        W.meta.signs[a] = dst;
+        ops.push(store.write(dst, png ? f : await shrinkImage(f)));
+      }
       else if (kind === 'visual') {
         const v = W.visual[+a];
         const dst = `${W.dir}/foto/${v.id}.jpg`;
@@ -1080,7 +1105,7 @@
     const mm = /^meas\.(\w+)\.rows\.(\d+)\./.exec(k);
     if (mm) {
       const cell = $('lvdStudio').querySelector(`[data-ev="${mm[1]}.${mm[2]}"]`);
-      if (cell) { const x = LVD.evalRow(mm[1], W.meas[mm[1]].rows[+mm[2]], W.limits); cell.innerHTML = x.ok == null ? '<span class="chip gray">—</span>' : x.ok ? chip('green', '✓') : mm[1] === 'leak' ? chip('amber', '!') : chip('red', '✗'); }
+      if (cell) { const x = LVD.evalRow(mm[1], W.meas[mm[1]].rows[+mm[2]], W.limits, LVD.pwrRef(W)); cell.innerHTML = x.ok == null ? '<span class="chip gray">—</span>' : x.ok ? chip('green', '✓') : mm[1] === 'leak' ? chip('amber', '!') : chip('red', '✗'); }
     }
     dirty = true;
     side();
@@ -1104,7 +1129,14 @@
     else if (act === 'add-func') { let n = W.func.length + 1; while (W.func.some((f) => f.id === `F-${String(n).padStart(2, '0')}`)) n += 1; W.func.push({ id: `F-${String(n).padStart(2, '0')}`, ref: '', test: L3(''), expected: L3(''), result: '', date: '', note: L3('') }); }
     else if (act === 'vis-all-ok') W.visual.forEach((v) => { if (!v.result) v.result = 'ok'; });
     else if (act === 'func-all-ok') W.func.forEach((f) => { if (!f.result) { f.result = 'ok'; if (!f.date) f.date = W.cond.date || todayStr(); } });
-    else if (act === 'del-photo') {
+    else if (act === 'del-sign') {
+      const k = a.dataset.k;
+      const f = (W.meta.signs || {})[k];
+      if (!f || !window.confirm('İmza görseli kaldırılsın mı?')) return;
+      W.meta.signs[k] = '';
+      try { await saveW([store.remove(f)]); } catch (x) { toast(`Kaldırılamadı: ${x.message}`, true); }
+      return;
+    } else if (act === 'del-photo') {
       const p = W.photos[i];
       if (!window.confirm(`${p.file.split('/').pop()} rapordan çıkarılıp silinsin mi?`)) return;
       W.photos.splice(i, 1);

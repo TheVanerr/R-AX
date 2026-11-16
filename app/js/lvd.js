@@ -23,17 +23,31 @@
     if (kind === 'iso' || kind === 'hv') return LIB.PAIRS_3N.map((t) => ({ tag: t, time: '', u: '', value: '', point: LIB.pairText(t), photo: null }));
     if (kind === 'res') return [{ tag: '1', time: '', t: '1', value: '', point: L3('Besleme fişi uçları (L1, L2, L3, N) — fiş çekildikten sonra', 'Supply plug pins (L1, L2, L3, N) — after unplugging', 'Steckerstifte (L1, L2, L3, N) — nach dem Ziehen des Steckers'), photo: null }];
     if (kind === 'leak') return [{ tag: '1', time: '', value: '', point: L3('Koruma iletkeni akımı — makine çalışır durumda, tüm yükler devrede', 'Protective conductor current — machine in operation, all loads on', 'Schutzleiterstrom — Maschine in Betrieb, alle Verbraucher eingeschaltet'), photo: null }];
+    if (kind === 'vd') return [{ tag: '1', time: '', cs: '', i: '', value: '', lim: '', point: L3('PE terminali → en uzak erişilebilir iletken parça', 'PE terminal → most distant accessible conductive part', 'PE-Klemme → am weitesten entferntes berührbares leitfähiges Teil'), photo: null }];
+    if (kind === 'pwr') return [{ tag: '1', time: '', u: '', i: '', pf: '', p: '', s: '', q: '', point: L3('Makine en yüksek kapasitede çalışırken', 'Machine running at maximum capacity', 'Maschine bei maximaler Auslastung'), photo: null }];
     return [];
+  }
+  /** Besleme metninden nominal gerilim: "3/N/PE AC 400 V 50 Hz" → 400, "380–415 V" → 380 */
+  function supplyNominal(s) {
+    const mm = /(\d{2,4}(?:[.,]\d+)?)\s*(?:[–-]\s*\d{2,4}(?:[.,]\d+)?\s*)?V(?![A-Za-z])/.exec(String(s || ''));
+    return mm ? +mm[1].replace(',', '.') : null;
+  }
+  /** Etiketteki tam yük akımı: "25 A", "11 kW / 25 A" → 25 */
+  function ratedCurrent(s) {
+    const t = String(s || '');
+    const mm = /(\d+(?:[.,]\d+)?)\s*A(?![A-Za-z])/.exec(t);
+    if (mm) return +mm[1].replace(',', '.');
+    return /^\s*\d+(?:[.,]\d+)?\s*$/.test(t) ? +t.replace(',', '.') : null;
   }
   function blank(opts) {
     const o = opts || {};
     const m = {
       dir: o.dir || '',
-      meta: { type: 'lvd', job: '', customer: '', model: '', serial: '', year: '', brand: 'DOLFIN', manufacturer: '', brandName: '', brandLine: '', docNo: '', rev: '00', reportDate: '', status: 'draft', langs: ['tr', 'en', 'de'], approvals: { titles: {} }, preparedLogo: '', link: '', riskDoc: '', coverPhoto: '' },
+      meta: { type: 'lvd', job: '', customer: '', model: '', serial: '', year: '', brand: 'DOLFIN', manufacturer: '', brandName: '', brandLine: '', docNo: '', rev: '00', reportDate: '', status: 'draft', langs: ['tr', 'en', 'de'], approvals: { titles: {} }, preparedLogo: '', link: '', riskDoc: '', coverPhoto: '', signs: { prepared: '', checked: '', approved: '' } },
       frontExtra: [],
       preamble: '',
       machine: { type: L3(''), supply: '', current: '', power: '', network: '', fuse: '', sccr: '', protClass: '', ip: '', connection: L3(''), desc: L3('') },
-      cond: { date: '', time: '', location: L3(''), ambient: '', testedBy: '', connection: L3(''), method: L3('') },
+      cond: { date: '', time: '', location: L3(''), temp: '', hum: '', ambient: '', testedBy: '', connection: L3(''), method: L3('') },
       limits: Object.assign({}, LIB.LIMITS),
       limitsSet: {},
       devices: [],
@@ -46,6 +60,7 @@
       extra: []
     };
     for (const k of MEAS) m.meas[k] = { rows: o.rows === false ? [] : blankRows(k), status: k === 'loop' ? 'site' : '', note: L3('') };
+    m.meas.pwr.un = '';
     return m;
   }
 
@@ -70,6 +85,8 @@
   /** Ölçüm alt başlığı → test türü */
   function measKind(title) {
     const k = norm(title);
+    if (/gerilim dusumu|voltage drop|volt drop|spannungsfall|\bvd\b/.test(k)) return 'vd';
+    if (/calisma testi|guc olcumu|aktif test|operating test|power measurement|betriebsprufung|leistungsmessung/.test(k)) return 'pwr';
     if (/koruma iletkeni akimi|kacak|leak|pe akimi|schutzleiterstrom/.test(k)) return 'leak';
     if (/artik|residual|restspannung/.test(k)) return 'res';
     if (/dongu|empedans|loop|test 2|\bzs\b|schleife/.test(k)) return 'loop';
@@ -141,14 +158,25 @@
       if (v != null) M.approvals[k] = v;
       const t = get(...names.map((n) => `${n} unvan`));
       if (t != null) M.approvals.titles[k] = /^(-|yok|none)$/i.test(t.trim()) ? L3('', '', '') : Md.splitLangs(t);
+      // İmza görseli (rapor klasörüne göre yol): onay tablosunda gösterilir
+      const sg = get(...names.map((n) => `${n} imza`));
+      if (sg) M.signs[k] = sg;
     }
   }
-  const FRONT_KNOWN = new Set(['tur', 'no', 'is no', 'proje no', 'musteri', 'model', 'makine seri no', 'seri no', 'yil', 'imal yili', 'marka', 'uretici', 'marka adi', 'marka satiri', 'dokuman', 'rapor no', 'rev', 'revizyon', 'tarih', 'rapor tarihi', 'durum', 'diller', 'hazirlayan', 'hazirlayan unvan', 'kontrol', 'kontrol eden', 'kontrol unvan', 'kontrol eden unvan', 'onay', 'onaylayan', 'onay unvan', 'onaylayan unvan', 'hazirlayan logo', 'risk analizi', 'risk analizi klasoru', 'risk analizi no', 'risk analizi dokuman', 'kapak foto', 'kapak fotografi'].map(norm));
+  const FRONT_KNOWN = new Set(['tur', 'no', 'is no', 'proje no', 'musteri', 'model', 'makine seri no', 'seri no', 'yil', 'imal yili', 'marka', 'uretici', 'marka adi', 'marka satiri', 'dokuman', 'rapor no', 'rev', 'revizyon', 'tarih', 'rapor tarihi', 'durum', 'diller', 'hazirlayan', 'hazirlayan unvan', 'kontrol', 'kontrol eden', 'kontrol unvan', 'kontrol eden unvan', 'onay', 'onaylayan', 'onay unvan', 'onaylayan unvan', 'hazirlayan logo', 'risk analizi', 'risk analizi klasoru', 'risk analizi no', 'risk analizi dokuman', 'kapak foto', 'kapak fotografi', 'hazirlayan imza', 'kontrol imza', 'kontrol eden imza', 'onay imza', 'onaylayan imza'].map(norm));
 
-  const ROW_ALIAS = {
-    tag: ['no', 'cift', 'çift', 'iletken cifti', 'iletken çifti', 'nokta no'], time: ['saat'], u: ['u', 'u v', 'test gerilimi'], t: ['sure', 'süre', 't', 't s'],
-    value: ['deger', 'değer', 'olcum', 'ölçüm', 'r pe', 'r iso', 'i', 'i pe', 'ipe', 'u olculen', 'gerilim'], point: ['nokta', 'olcum noktasi', 'ölçüm noktası', 'aciklama', 'açıklama'], photo: ['fotograf', 'fotoğraf', 'foto']
+  /** Ölçüm tablosu sütunları: ortak + teste özgü (ölçülen test akımı / gerilimi, kesit, güç değerleri) */
+  const A_BASE = { tag: ['no', 'cift', 'çift', 'iletken cifti', 'iletken çifti', 'nokta no'], time: ['saat'], point: ['nokta', 'olcum noktasi', 'ölçüm noktası', 'aciklama', 'açıklama'], photo: ['fotograf', 'fotoğraf', 'foto'] };
+  const A_KIND = {
+    rpe: { i: ['i', 'i test', 'test akimi', 'test akımı', 'i olculen'], u: ['u', 'u v', 'u olculen'], value: ['deger', 'değer', 'olcum', 'ölçüm', 'r pe'] },
+    iso: { u: ['u', 'u v', 'test gerilimi', 'u iso', 'u olculen'], value: ['deger', 'değer', 'olcum', 'ölçüm', 'r iso'] },
+    hv: { u: ['u', 'u v', 'test gerilimi', 'u olculen'], value: ['deger', 'değer', 'olcum', 'ölçüm', 'i', 'kacak akim', 'kaçak akım'] },
+    res: { t: ['sure', 'süre', 't', 't s'], value: ['deger', 'değer', 'olcum', 'ölçüm', 'u', 'gerilim'] },
+    leak: { value: ['deger', 'değer', 'olcum', 'ölçüm', 'i', 'i pe', 'ipe'] },
+    vd: { cs: ['kesit', 'kesit mm2', 'kesit mm²'], i: ['i', 'akim', 'akım', 'test akimi', 'test akımı'], value: ['deger', 'değer', 'du', 'ΔU', 'gerilim dusumu', 'gerilim düşümü', 'u'], lim: ['sinir', 'sınır', 'limit', 'du max'] },
+    pwr: { u: ['u', 'u v', 'gerilim'], i: ['i', 'i a', 'akim', 'akım'], pf: ['cos', 'cos φ', 'cosφ', 'cos phi', 'guc faktoru', 'güç faktörü'], p: ['p', 'p kw', 'aktif guc', 'aktif güç'], s: ['s', 's kva', 'gorunur guc', 'görünür güç'], q: ['q', 'q kvar', 'reaktif guc', 'reaktif güç'], point: ['durum', 'calisma durumu', 'çalışma durumu', 'nokta', 'aciklama', 'açıklama'] }
   };
+  const EXTRA_COLS = ['u', 'i', 't', 'cs', 'lim', 'pf', 'p', 's', 'q'];
   const LOOP_ALIAS = { tag: ['no'], time: ['saat'], circuit: ['devre', 'nokta', 'olcum noktasi'], device: ['koruma', 'koruma cihazi', 'koruma cihazı', 'sigorta'], zs: ['zs', 'zs olculen', 'deger', 'değer'], zsMax: ['zs max', 'zsmax', 'zs izin', 'izin verilen'], photo: ['fotograf', 'fotoğraf', 'foto'] };
 
   /** lvd.md metni → model. dir: rapor klasörü (fotoğraf yolları buna göre çözülür) */
@@ -179,6 +207,7 @@
     });
     m.visual = mergeVisual(m.visual);
     m.func = mergeFunc(m.func, seen.fonksiyon);
+    for (const k of Object.keys(m.meta.signs)) if (m.meta.signs[k]) m.meta.signs[k] = join(dir, m.meta.signs[k]);
     m._sections = seen;
     return m;
   }
@@ -207,16 +236,19 @@
   };
   P.test = (n, m) => {
     const C = m.cond;
-    for (const [k, names] of Object.entries({ date: ['tarih'], time: ['saat'], ambient: ['ortam', 'ortam kosullari', 'ortam koşulları'], testedBy: ['test eden', 'olcen', 'ölçen'] })) { const v = TXT(n, ...names); if (v) C[k] = v; }
+    for (const [k, names] of Object.entries({ date: ['tarih'], time: ['saat'], temp: ['sicaklik', 'sıcaklık', 'ortam sicakligi', 'ortam sıcaklığı'], hum: ['nem', 'bagil nem', 'bağıl nem'], ambient: ['ortam', 'ortam kosullari', 'ortam koşulları'], testedBy: ['test eden', 'olcen', 'ölçen'] })) { const v = TXT(n, ...names); if (v) C[k] = v; }
     for (const [k, names] of Object.entries({ location: ['yer', 'test yeri'], connection: ['baglanti', 'bağlantı'], method: ['yontem', 'yöntem'] })) { const v = MLF(n, ...names); if (v) C[k] = v; }
     const L = m.limits;
     const S = m.limitsSet;
     const rpe = numsOf(TXT(n, 'r pe', 'rpe'));
     if (rpe.length >= 3) { Object.assign(L, { rpeI: rpe[0], rpeT: rpe[1], rpeMax: rpe[2] }); S.rpe = true; }
+    // 4. sayı: uygulanan test geriliminin toleransı (± V)
     const iso = numsOf(TXT(n, 'r iso', 'riso'));
-    if (iso.length >= 3) { Object.assign(L, { isoU: iso[0], isoT: iso[1], isoMin: iso[2] }); S.iso = true; }
+    if (iso.length >= 3) { Object.assign(L, { isoU: iso[0], isoT: iso[1], isoMin: iso[2] }); if (iso[3] != null) L.isoTol = iso[3]; S.iso = true; }
     const hv = numsOf(TXT(n, 'hv', 'gerilim testi'));
-    if (hv.length >= 3) { Object.assign(L, { hvU: hv[0], hvT: hv[1], hvMax: hv[2] }); S.hv = true; }
+    if (hv.length >= 3) { Object.assign(L, { hvU: hv[0], hvT: hv[1], hvMax: hv[2] }); if (hv[3] != null) L.hvTol = hv[3]; S.hv = true; }
+    const us = numsOf(TXT(n, 'gerilim sapmasi', 'gerilim sapması'));
+    if (us.length) { L.uTol = us[0]; S.pwr = true; }
     const lk = numsOf(TXT(n, 'kacak akim', 'kaçak akım', 'koruma iletkeni akimi', 'koruma iletkeni akımı'));
     if (lk.length) { L.leakMax = lk[0]; S.leak = true; }
     const rs = numsOf(TXT(n, 'artik gerilim', 'artık gerilim'));
@@ -252,16 +284,17 @@
       sec.status = STATUS(TXT(c, 'durum'));
       const note = MLF(c, 'not');
       if (note) sec.note = note;
+      if (kind === 'pwr') sec.un = TXT(c, 'nominal gerilim', 'un', 'u n', 'nennspannung');
       const t = c.tables[0];
       if (!t) continue;
       if (kind === 'loop') {
         sec.rows = Md.tableObjects(t, LOOP_ALIAS).map((r, i) => ({ tag: cellTr(r.tag) || String(i + 1), time: cellTr(r.time), circuit: r.circuit || L3(''), device: cellTr(r.device), zs: cellTr(r.zs), zsMax: cellTr(r.zsMax), photo: join(dir, cellTr(r.photo)) }));
       } else {
-        sec.rows = Md.tableObjects(t, ROW_ALIAS).map((r, i) => {
+        const alias = Object.assign({}, A_BASE, A_KIND[kind]);
+        sec.rows = Md.tableObjects(t, alias).map((r, i) => {
           const tag = cellTr(r.tag).replace(/\s+/g, '').toUpperCase() || String(i + 1);
           const row = { tag, time: cellTr(r.time), value: cellTr(r.value), point: r.point || L3(''), photo: join(dir, cellTr(r.photo)) };
-          if (kind === 'hv') row.u = cellTr(r.u);
-          if (kind === 'res') row.t = cellTr(r.t);
+          for (const x of EXTRA_COLS) if (A_KIND[kind][x]) row[x] = cellTr(r[x]);
           return row;
         });
       }
@@ -305,23 +338,48 @@
     const In = +mm[2].replace(',', '.');
     return { type, In, Ia: LIB.TRIP_K[type] * In };
   }
-  /** Satır değerlendirmesi: { v (parseNum), ok (true / false / null), lim } */
-  function evalRow(kind, r, L) {
+  /**
+   * Satır değerlendirmesi: { v (parseNum), ok (true / false / null), lim, valOk (değer), tol (uygulanan test akımı / gerilimi) }.
+   * ref: { un (nominal gerilim), irated (etiketteki tam yük akımı) } — çalışma testi için.
+   */
+  function evalRow(kind, r, L, ref) {
+    const R = ref || {};
     if (kind === 'loop') {
       const zs = U.parseNum(r.zs);
       let max = U.num(r.zsMax);
       if (max == null) { const tr = tripOf(r.device); if (tr) max = +(L.u0 / tr.Ia).toFixed(3); }
       return { v: zs, ok: zs && max != null ? zs.n <= max : null, lim: max };
     }
+    if (kind === 'vd') {
+      const v = U.parseNum(r.value);
+      let lim = U.num(r.lim);
+      if (lim == null) lim = LIB.vdLimit(r.cs, r.i);
+      return { v, ok: v && lim != null ? v.n <= lim : null, lim };
+    }
+    if (kind === 'pwr') {
+      const v = U.parseNum(r.u);
+      const du = v && R.un ? ((v.n - R.un) / R.un) * 100 : null;
+      const uOk = du == null ? null : Math.abs(du) <= L.uTol + 1e-9;
+      const i = U.num(r.i);
+      const iOk = i != null && R.irated ? i <= R.irated + 1e-9 : null;
+      const ok = uOk === false || iOk === false ? false : uOk || iOk ? true : null;
+      return { v, ok, lim: L.uTol, du, uOk, iOk };
+    }
     const v = U.parseNum(r.value);
     if (!v) return { v: null, ok: null, lim: null };
-    if (kind === 'rpe') return { v, ok: v.n <= L.rpeMax, lim: L.rpeMax };
-    if (kind === 'iso') return { v, ok: v.n >= L.isoMin, lim: L.isoMin };
-    if (kind === 'hv') return { v, ok: v.n <= L.hvMax, lim: L.hvMax };
-    if (kind === 'res') return { v, ok: v.n <= L.resMax, lim: L.resMax };
-    if (kind === 'leak') return { v, ok: v.n <= L.leakMax, lim: L.leakMax };
-    return { v, ok: null, lim: null };
+    // Uygulanan test akımı / gerilimi yazılmışsa toleransı da değerlendirilir
+    let tol = null;
+    const num = (s) => (s ? U.num(s) : null);
+    if (kind === 'rpe' && num(r.i) != null) tol = num(r.i) >= L.rpeI - 1e-9;
+    if (kind === 'iso' && num(r.u) != null) tol = Math.abs(num(r.u) - L.isoU) <= L.isoTol + 1e-9;
+    if (kind === 'hv' && num(r.u) != null) tol = Math.abs(num(r.u) - L.hvU) <= L.hvTol + 1e-9;
+    const LIM = { rpe: [L.rpeMax, (n) => n <= L.rpeMax], iso: [L.isoMin, (n) => n >= L.isoMin], hv: [L.hvMax, (n) => n <= L.hvMax], res: [L.resMax, (n) => n <= L.resMax], leak: [L.leakMax, (n) => n <= L.leakMax] }[kind];
+    if (!LIM) return { v, ok: null, lim: null };
+    const valOk = LIM[1](v.n);
+    return { v, ok: valOk && tol !== false, lim: LIM[0], valOk, tol };
   }
+  /** Çalışma testi için başvuru değerleri: nominal gerilim (md ya da besleme metni) ve etiketteki tam yük akımı */
+  const pwrRef = (m) => ({ un: U.num(m.meas.pwr && m.meas.pwr.un) || supplyNominal(m.machine.supply), irated: ratedCurrent(m.machine.current) });
 
   /**
    * Durumlar: pass (uygun) · fail (uygunsuz) · open (eksik değer / sonuç) · none (satır yok, yapılmadı) ·
@@ -334,10 +392,12 @@
     const checks = [];
     const add = (level, msg) => checks.push({ level, msg });
     const visById = Object.fromEntries(m.visual.map((v) => [v.id, v]));
+    const ref = pwrRef(m);
     for (const k of MEAS) {
       const sec = m.meas[k];
-      const rows = sec.rows.map((r) => Object.assign({ r }, evalRow(k, r, L)));
-      const valid = rows.filter((x) => x.v && (k !== 'loop' || x.lim != null));
+      const rows = sec.rows.map((r) => Object.assign({ r }, evalRow(k, r, L, ref)));
+      // Sınırı hesaplanamayan Z_s / ΔU ve başvuru değeri olmayan çalışma testi satırı değerlendirilmez (eksik sayılır)
+      const valid = rows.filter((x) => x.v && ((k !== 'loop' && k !== 'vd') || x.lim != null) && (k !== 'pwr' || x.ok != null));
       const fails = valid.filter((x) => x.ok === false).length;
       const missing = rows.filter((x) => !x.v).length;
       let state;
@@ -384,18 +444,31 @@
       if (!d.serial) add('info', `${(d.name && d.name.tr) || d.model}: seri no yok`);
       if (!d.calib && !d.valid) add('warn', `${(d.name && d.name.tr) || d.model}: kalibrasyon bilgisi yok`);
     }
-    const label = { rpe: 'R_PE', loop: 'Z_s', iso: 'R_ISO', hv: 'HV', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı' };
+    const label = { rpe: 'R_PE', vd: 'ΔU', loop: 'Z_s', iso: 'R_ISO', hv: 'HV', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı', pwr: 'Çalışma testi' };
+    const dec = (v) => String(+(+v).toFixed(2)).replace('.', ',');
     for (const k of MEAS) {
       const T = tests[k];
       for (const x of T.rows) {
-        if (x.ok === false && k !== 'leak') add('error', `${label[k]} ${x.r.tag}: ${x.r.value || x.r.zs} — kabul kriteri dışında`);
-        if (x.ok === false && k === 'leak') add(T.state === 'pass' ? 'info' : 'warn', `Koruma iletkeni akımı ${x.r.value} mA > ${L.leakMax} mA: §8.2.6 önlemleri gerekli (G-15)`);
+        if (k === 'pwr') {
+          if (x.uOk === false) add('error', `Çalışma testi ${x.r.tag}: besleme gerilimi ${x.r.u} V, nominale göre %${dec(x.du)} sapma (sınır ±%${dec(L.uTol)})`);
+          if (x.iOk === false) add('error', `Çalışma testi ${x.r.tag}: akım ${x.r.i} A, etiketteki tam yük akımını (${dec(ref.irated)} A) aşıyor`);
+          if (x.v && x.ok == null) add('warn', `Çalışma testi ${x.r.tag}: nominal gerilim (Makine: besleme ya da Ölçümler: nominal gerilim) ve etiket akımı yazılmamış`);
+        } else if (k === 'leak') {
+          if (x.ok === false) add(T.state === 'pass' ? 'info' : 'warn', `Koruma iletkeni akımı ${x.r.value} mA > ${L.leakMax} mA: §8.2.6 önlemleri gerekli (G-15)`);
+        } else {
+          if (x.ok === false && x.valOk !== true) add('error', `${label[k]} ${x.r.tag}: ${x.r.value || x.r.zs} — kabul kriteri dışında`);
+          if (x.tol === false && k === 'rpe') add('error', `R_PE ${x.r.tag}: test akımı ${x.r.i} A < ${dec(L.rpeI)} A`);
+          if (x.tol === false && k === 'iso') add('error', `R_ISO ${x.r.tag}: test gerilimi ${x.r.u} V, ${L.isoU} ± ${L.isoTol} V dışında`);
+          if (x.tol === false && k === 'hv') add('error', `HV ${x.r.tag}: test gerilimi ${x.r.u} V, ${L.hvU} ± ${L.hvTol} V dışında`);
+        }
         if (!x.v && x.r.photo) add('warn', `${label[k]} ${x.r.tag}: fotoğraf var, değer yazılmamış`);
         if (x.v && !x.r.photo && k !== 'loop') add('info', `${label[k]} ${x.r.tag}: ölçüm fotoğrafı yok`);
         if (k === 'loop' && x.v && x.lim == null) add('warn', `Z_s ${x.r.tag}: koruma cihazı (ör. C16) veya Zs max yazılmamış`);
+        if (k === 'vd' && x.v && x.lim == null) add('warn', `ΔU ${x.r.tag}: koruma iletkeni kesiti (≥ 1 mm²) ya da sınır yazılmamış`);
         if (x.r.photo && o.exists && !o.exists(x.r.photo)) add('error', `Bulunamayan fotoğraf: ${x.r.photo}`);
       }
     }
+    for (const k of Object.keys(M.signs || {})) if (M.signs[k] && o.exists && !o.exists(M.signs[k])) add('error', `Bulunamayan imza görseli: ${M.signs[k]}`);
     for (const t of LIB.TESTS) {
       const s = tests[t.key].state;
       if (t.req && (s === 'none' || s === 'skip')) add('warn', `${t.letter}) ${t.name.tr}: zorunlu test yapılmamış`);
@@ -478,8 +551,8 @@
     return out;
   }
   const TITLE = {
-    rpe: 'Koruyucu bağlama devresinin sürekliliği (R_PE)', loop: 'Hata döngüsü empedansı (Test 2)', iso: 'Yalıtım direnci (R_ISO)',
-    hv: 'Gerilim testi (HV)', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı (kaçak akım)'
+    rpe: 'Koruyucu bağlama devresinin sürekliliği (R_PE)', vd: 'Koruyucu bağlama devresinde gerilim düşümü (ΔU)', loop: 'Hata döngüsü empedansı (Test 2)', iso: 'Yalıtım direnci (R_ISO)',
+    hv: 'Gerilim testi (HV)', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı (kaçak akım)', pwr: 'Çalışma testi (aktif test: gerilim, akım, güç)'
   };
   const libText = (list, id) => list.find((x) => x.id === id);
 
@@ -501,7 +574,8 @@
       ['hazirlayan', A.prepared], ['hazirlayan unvan', mlInline(Tt.prepared)],
       ['kontrol', A.checked], ['kontrol unvan', mlInline(Tt.checked)],
       ['onay', A.approved], ['onay unvan', mlInline(Tt.approved)],
-      ['hazirlayan logo', M.preparedLogo], ['risk analizi', M.link], ['risk analizi no', M.riskDoc], ['kapak foto', relOf(m, M.coverPhoto)]];
+      ['hazirlayan logo', M.preparedLogo], ['risk analizi', M.link], ['risk analizi no', M.riskDoc], ['kapak foto', relOf(m, M.coverPhoto)],
+      ['hazirlayan imza', relOf(m, (M.signs || {}).prepared)], ['kontrol imza', relOf(m, (M.signs || {}).checked)], ['onay imza', relOf(m, (M.signs || {}).approved)]];
     L.push('---');
     for (const [k, v] of front) if (v != null && String(v).trim() !== '') L.push(`${k}: ${String(v).trim()}`);
     for (const f of m.frontExtra || []) L.push(`${f.keyRaw}: ${f.value}`);
@@ -521,16 +595,19 @@
     L.push('# Test Koşulları');
     for (const [k, v] of [['tarih', K.date], ['saat', K.time]]) L.push(...fieldLines(k, v));
     L.push(...fieldLines('yer', K.location));
+    L.push(...fieldLines('sıcaklık', K.temp));
+    L.push(...fieldLines('nem', K.hum));
     L.push(...fieldLines('ortam', K.ambient));
     L.push(...fieldLines('test eden', K.testedBy));
     L.push(...fieldLines('bağlantı', K.connection));
     L.push(...fieldLines('yöntem', K.method));
     L.push(`- R_PE: ${dec(Li.rpeI)} A · ${dec(Li.rpeT)} s · ≤ ${Number(Li.rpeMax).toFixed(2).replace('.', ',')} Ω`);
-    L.push(`- R_ISO: ${dec(Li.isoU)} V DC · ${dec(Li.isoT)} s · ≥ ${Number(Li.isoMin).toFixed(2).replace('.', ',')} MΩ`);
-    L.push(`- HV: ${dec(Li.hvU)} V AC · ${dec(Li.hvT)} s · ≤ ${Number(Li.hvMax).toFixed(2).replace('.', ',')} mA`);
+    L.push(`- R_ISO: ${dec(Li.isoU)} V DC · ${dec(Li.isoT)} s · ≥ ${Number(Li.isoMin).toFixed(2).replace('.', ',')} MΩ · ±${dec(Li.isoTol)} V`);
+    L.push(`- HV: ${dec(Li.hvU)} V AC · ${dec(Li.hvT)} s · ≤ ${Number(Li.hvMax).toFixed(2).replace('.', ',')} mA · ±${dec(Li.hvTol)} V`);
     L.push(`- kaçak akım: ≤ ${dec(Li.leakMax)} mA`);
     L.push(`- artık gerilim: ≤ ${dec(Li.resMax)} V · ${dec(Li.resT)} s`);
     L.push(`- U0: ${dec(Li.u0)} V`);
+    L.push(`- gerilim sapması: ±${dec(Li.uTol)} %`);
     L.push('');
 
     L.push('# Test Cihazları');
@@ -550,13 +627,26 @@
       const sec = m.meas[k];
       L.push(`## ${TITLE[k]}`);
       if (sec.status) L.push(`- durum: ${STATUS_MD[sec.status]}`);
+      if (k === 'pwr' && sec.un) L.push(`- nominal gerilim: ${sec.un}`);
       L.push(...fieldLines('not', sec.note));
+      const rows = sec.rows;
+      const has = (x) => rows.some((r) => r[x] != null && String(r[x]).trim() !== '');
+      const ph = (r) => relOf(m, r.photo);
       if (k === 'loop') {
-        if (sec.rows.length) L.push(...tableLines(['No', 'Saat', 'Devre', 'Koruma', 'Zs', 'Zs max', 'Fotoğraf'], sec.rows.map((r) => [r.tag, r.time, r.circuit, r.device, r.zs, r.zsMax, relOf(m, r.photo)])));
-      } else if (k === 'hv') L.push(...tableLines(['Çift', 'Saat', 'U', 'Değer', 'Nokta', 'Fotoğraf'], sec.rows.map((r) => [r.tag, r.time, r.u, r.value, r.point, relOf(m, r.photo)])));
-      else if (k === 'iso') L.push(...tableLines(['Çift', 'Saat', 'Değer', 'Nokta', 'Fotoğraf'], sec.rows.map((r) => [r.tag, r.time, r.value, r.point, relOf(m, r.photo)])));
-      else if (k === 'res') L.push(...tableLines(['No', 'Saat', 'Süre', 'Değer', 'Nokta', 'Fotoğraf'], sec.rows.map((r) => [r.tag, r.time, r.t, r.value, r.point, relOf(m, r.photo)])));
-      else L.push(...tableLines(['No', 'Saat', 'Değer', 'Nokta', 'Fotoğraf'], sec.rows.map((r) => [r.tag, r.time, r.value, r.point, relOf(m, r.photo)])));
+        if (rows.length) L.push(...tableLines(['No', 'Saat', 'Devre', 'Koruma', 'Zs', 'Zs max', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.circuit, r.device, r.zs, r.zsMax, ph(r)])));
+      } else if (k === 'rpe') {
+        // Ölçülen test akımı (I) ve gerilimi (U) yalnız yazılmışsa sütun olarak eklenir
+        const hi = has('i');
+        const hu = has('u');
+        L.push(...tableLines(['No', 'Saat', ...(hi ? ['I'] : []), ...(hu ? ['U'] : []), 'Değer', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, ...(hi ? [r.i] : []), ...(hu ? [r.u] : []), r.value, r.point, ph(r)])));
+      } else if (k === 'iso') {
+        const hu = has('u');
+        L.push(...tableLines(['Çift', 'Saat', ...(hu ? ['U'] : []), 'Değer', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, ...(hu ? [r.u] : []), r.value, r.point, ph(r)])));
+      } else if (k === 'hv') L.push(...tableLines(['Çift', 'Saat', 'U', 'Değer', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.u, r.value, r.point, ph(r)])));
+      else if (k === 'res') L.push(...tableLines(['No', 'Saat', 'Süre', 'Değer', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.t, r.value, r.point, ph(r)])));
+      else if (k === 'vd') L.push(...tableLines(['No', 'Saat', 'Kesit', 'I', 'ΔU', 'Sınır', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.cs, r.i, r.value, r.lim, r.point, ph(r)])));
+      else if (k === 'pwr') L.push(...tableLines(['No', 'Saat', 'U', 'I', 'cos φ', 'P', 'S', 'Q', 'Durum', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.u, r.i, r.pf, r.p, r.s, r.q, r.point, ph(r)])));
+      else L.push(...tableLines(['No', 'Saat', 'Değer', 'Nokta', 'Fotoğraf'], rows.map((r) => [r.tag, r.time, r.value, r.point, ph(r)])));
       L.push('');
     }
 
@@ -688,5 +778,5 @@
     return m;
   }
 
-  return { blank, parse, serialize, evaluate, evalRow, tripOf, importRA, create, revisions, sectionKey, measKind, RESULT, STATUS, isEmptyML, toDate };
+  return { blank, parse, serialize, evaluate, evalRow, pwrRef, supplyNominal, ratedCurrent, tripOf, importRA, create, revisions, sectionKey, measKind, RESULT, STATUS, isEmptyML, toDate };
 });

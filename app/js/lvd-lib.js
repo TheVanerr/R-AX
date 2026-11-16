@@ -16,30 +16,51 @@
   const L3 = (tr, en, de) => ({ tr, en, de });
 
   /* ─── Test programı (EN 60204-1 §18.1) ─────────────────────── */
+  // mode: on = aktif test (makine enerjili) · off = pasif test (besleme kesik). extra: §18.1 a–h dışındaki ek test.
   const TESTS = [
-    { key: 'visual', letter: 'a', clause: '§18.1 a', req: true,
+    { key: 'visual', letter: 'a', clause: '§18.1 a', req: true, mode: 'off',
       name: L3('Elektrik donanımının teknik dokümantasyona uygunluğunun doğrulanması (gözle kontrol)', 'Verification that the electrical equipment complies with its technical documentation (visual inspection)', 'Prüfung der Übereinstimmung der elektrischen Ausrüstung mit der technischen Dokumentation (Sichtprüfung)') },
-    { key: 'rpe', letter: 'b', clause: '§18.2.2', req: true,
+    { key: 'rpe', letter: 'b', clause: '§18.2.2', req: true, mode: 'off',
       name: L3('Koruyucu bağlama devresinin sürekliliği (Test 1)', 'Continuity of the protective bonding circuit (Test 1)', 'Durchgängigkeit des Schutzleitersystems (Prüfung 1)') },
-    { key: 'loop', letter: 'c', clause: '§18.2.3', req: false,
+    { key: 'vd', letter: 'b', clause: '§18.2.2 · §8.2.2', req: false, mode: 'off',
+      name: L3('Koruyucu bağlama devresinde gerilim düşümü (yüksek test akımı)', 'Voltage drop in the protective bonding circuit (high test current)', 'Spannungsfall im Schutzleitersystem (hoher Prüfstrom)') },
+    { key: 'loop', letter: 'c', clause: '§18.2.3', req: false, mode: 'on',
       name: L3('Otomatik kesme koşulları: hata döngüsü empedansı ve aşırı akım koruma cihazı (Test 2)', 'Conditions for automatic disconnection: fault loop impedance and overcurrent protective device (Test 2)', 'Bedingungen der automatischen Abschaltung: Fehlerschleifenimpedanz und Überstromschutzeinrichtung (Prüfung 2)') },
-    { key: 'iso', letter: 'd', clause: '§18.3', req: false,
+    { key: 'iso', letter: 'd', clause: '§18.3', req: false, mode: 'off',
       name: L3('Yalıtım direnci testi', 'Insulation resistance test', 'Isolationswiderstandsprüfung') },
-    { key: 'hv', letter: 'e', clause: '§18.4', req: false,
-      name: L3('Gerilim testi', 'Voltage test', 'Spannungsprüfung') },
-    { key: 'res', letter: 'f', clause: '§18.5', req: false,
+    { key: 'hv', letter: 'e', clause: '§18.4', req: false, mode: 'off',
+      name: L3('Gerilim testi (dielektrik dayanım, Hi-Pot)', 'Voltage test (dielectric strength, Hi-Pot)', 'Spannungsprüfung (Spannungsfestigkeit, Hi-Pot)') },
+    { key: 'res', letter: 'f', clause: '§18.5', req: false, mode: 'on',
       name: L3('Artık gerilimlere karşı koruma', 'Protection against residual voltages', 'Schutz gegen Restspannungen') },
-    { key: 'leak', letter: 'g', clause: '§8.2.6', req: false,
+    { key: 'leak', letter: 'g', clause: '§8.2.6', req: false, mode: 'on',
       name: L3('Koruma iletkeni akımı (§8.2.6 gerekliliklerinin doğrulanması)', 'Protective conductor current (verification of the requirements of §8.2.6)', 'Schutzleiterstrom (Prüfung der Anforderungen nach §8.2.6)') },
-    { key: 'func', letter: 'h', clause: '§18.6', req: true,
-      name: L3('Fonksiyon testleri', 'Functional tests', 'Funktionsprüfungen') }
+    { key: 'func', letter: 'h', clause: '§18.6', req: true, mode: 'on',
+      name: L3('Fonksiyon testleri', 'Functional tests', 'Funktionsprüfungen') },
+    { key: 'pwr', letter: '+', clause: '§4.3.2 · §16.4', req: false, mode: 'on', extra: true,
+      name: L3('Çalışma testi: besleme gerilimi, akım ve güç (aktif test)', 'Operating test: supply voltage, current and power (active test)', 'Betriebsprüfung: Versorgungsspannung, Strom und Leistung (aktive Prüfung)') }
   ];
-  const MEAS = ['rpe', 'loop', 'iso', 'hv', 'res', 'leak'];
+  const MEAS = ['rpe', 'vd', 'loop', 'iso', 'hv', 'res', 'leak', 'pwr'];
 
-  /** Varsayılan test parametreleri ve kabul kriterleri. rpe/iso/hv risk analizindeki elektrik testleriyle aynıdır. */
-  const LIMITS = { rpeI: 0.2, rpeT: 5, rpeMax: 0.10, isoU: 500, isoT: 10, isoMin: 1.00, hvU: 1500, hvT: 5, hvMax: 1.50, leakMax: 10, resMax: 60, resT: 5, u0: 230 };
+  /**
+   * Varsayılan test parametreleri ve kabul kriterleri. rpe/iso/hv risk analizindeki elektrik testleriyle aynıdır.
+   * hvTol / isoTol: uygulanan test geriliminin toleransı (V) · uTol: çalışma testinde besleme gerilimi sapması (± %, EN 60204-1 §4.3.2)
+   */
+  const LIMITS = { rpeI: 0.2, rpeT: 5, rpeMax: 0.10, isoU: 500, isoT: 10, isoMin: 1.00, isoTol: 50, hvU: 1500, hvT: 5, hvMax: 1.50, hvTol: 100, leakMax: 10, resMax: 60, resT: 5, u0: 230, uTol: 10 };
   /** Anlık açma akımı katsayısı (I_a = k · I_n): B, C, D eğrisi */
   const TRIP_K = { B: 5, C: 10, D: 20, K: 14, Z: 3 };
+  /**
+   * Koruyucu bağlama devresinde en büyük gerilim düşümü, 10 A test akımı için (EN 60204-1:2006 Tablo 9):
+   * koruma iletkeni kesiti (mm²) → ΔU (V). Kesit tablodaki değerler arasındaysa bir üst kesitin (daha sıkı) değeri alınır;
+   * 1 mm²'den küçük kesit için sınır satırda yazılır.
+   */
+  const VD_TABLE = [[1.0, 3.3], [1.5, 2.6], [2.5, 1.9], [4.0, 1.4], [6.0, 1.0]];
+  function vdLimit(cs, i) {
+    const c = +String(cs || '').replace(',', '.').replace(/[^\d.]/g, '');
+    if (!c || c < 1.0) return null;
+    const row = VD_TABLE.find(([s]) => s >= c - 1e-9) || VD_TABLE[VD_TABLE.length - 1];
+    const I = +String(i || '').replace(',', '.').replace(/[^\d.]/g, '');
+    return +(row[1] * (I > 0 ? I / 10 : 1)).toFixed(3);
+  }
 
   /* ─── Gözle kontrol (§18.1 a) ──────────────────────────────── */
   const GROUPS = {
@@ -182,6 +203,8 @@
     { re: /^(?:KACAK|KAÇAK|LEAK|IPE|I-PE)\s*(\d*)/i, test: 'leak', tag: (m) => m[1] || '1' },
     { re: /^(?:ARTIK|ARTİK|RESIDUAL)\s*(\d*)/i, test: 'res', tag: (m) => m[1] || '1' },
     { re: /^(?:ZS|LOOP|DONGU|DÖNGÜ)\s*(\d*)/i, test: 'loop', tag: (m) => m[1] || '1' },
+    { re: /^(?:VD|DUSUM|DÜŞÜM|GERILIM DUSUMU|GERİLİM DÜŞÜMÜ|VOLT DROP|VOLTAGE DROP)\s*(\d*)/i, test: 'vd', tag: (m) => m[1] || '1' },
+    { re: /^(?:GUC|GÜÇ|POWER|ENERJI|ENERJİ|AKTIF|AKTİF)\s*(\d*)/i, test: 'pwr', tag: (m) => m[1] || '1' },
     { re: /^(?:ETIKET|ETİKET|NAMEPLATE|TYPSCHILD)/i, kind: 'nameplate' },
     { re: /^(?:PANO|PANEL|SCHALTSCHRANK)/i, kind: 'panel' },
     { re: /^(?:GENEL|KAPAK|COVER)/i, kind: 'cover' },
@@ -206,6 +229,8 @@
     if (test === 'leak') return `KACAK ${t}`;
     if (test === 'res') return `ARTIK ${t}`;
     if (test === 'loop') return `ZS ${t}`;
+    if (test === 'vd') return `VD ${t}`;
+    if (test === 'pwr') return `GUC ${t}`;
     return t || 'foto';
   }
   const PHOTO_KINDS = {
@@ -237,9 +262,9 @@
   const T = {
     tr: {
       dec: ',', fill: '[doldurulacak]', none: '—',
-      hdrTitle: 'LVD Test Raporu', pageWord: 'Sayfa', uncontrolled: 'Kontrolsüz kopya — çoğaltılamaz', jobPrefix: 'İş No',
+      hdrTitle: 'Elektriksel Kalite ve Güvenlik Testi', pageWord: 'Sayfa', uncontrolled: 'Kontrolsüz kopya — çoğaltılamaz', jobPrefix: 'İş No',
       cover: {
-        kicker: 'ELEKTRİKSEL GÜVENLİK TEST RAPORU', mark: 'LVD', std: '2014/35/AB<br>EN 60204-1:2018<br>Bölüm 18<br>IEC 61557',
+        kicker: 'ELEKTRİK SİSTEMİ KALİTE VE GÜVENLİK TEST RAPORU', mark: 'LVD', std: '2014/35/AB<br>EN 60204-1:2018<br>Bölüm 18<br>IEC 61557',
         rows: { job: 'İş no', customer: 'Müşteri', model: 'Model', serial: 'Makine seri no', docNo: 'Rapor no', rev: 'Revizyon', date: 'Test tarihi', pages: 'Sayfa sayısı' },
         sign: ['Hazırlayan', 'Kontrol Eden', 'Onaylayan']
       },
@@ -263,20 +288,22 @@
       s3: 'Makine ve Elektrik Beslemesi',
       mach: { manufacturer: 'Üretici', model: 'Marka / model', serial: 'Seri no / imal yılı', type: 'Makine tipi', supply: 'Besleme (gerilim / faz / frekans)', current: 'Anma akımı (tam yük)', power: 'Kurulu güç', network: 'Şebeke tipi', fuse: 'Ön koruma (sigorta)', sccr: 'Kısa devre dayanımı', protClass: 'Koruma sınıfı', ip: 'Koruma derecesi (IP)', connection: 'Besleme bağlantısı' },
       s4: 'Test Koşulları ve Test Cihazları',
-      cond: { date: 'Test tarihi / saati', location: 'Test yeri', ambient: 'Ortam koşulları', testedBy: 'Test eden', connection: 'Bağlantı', method: 'Yöntem' },
+      cond: { date: 'Test tarihi / saati', location: 'Test yeri', temp: 'Ortam sıcaklığı', hum: 'Bağıl nem', ambient: 'Ortam koşulları', testedBy: 'Test eden', connection: 'Bağlantı', method: 'Yöntem' },
       devTitle: 'Test cihazları', devCols: ['Cihaz', 'Marka / model', 'Seri no', 'Kalibrasyon', 'Geçerlilik', 'Durum'],
       devNote: 'EN 60204-1 §18.1, §18.2 ve §18.3 testleri için IEC 61557 serisine uygun ölçüm cihazlarının kullanılmasını öngörür.',
       calOk: 'geçerli', calExp: 'süresi dolmuş',
       s5: 'Test Programı ve Sonuç Özeti',
       p5: 'EN 60204-1 §18.1\'e göre makineye özgü bir ürün standardı yoksa doğrulama en az a), b) ve h) maddelerini kapsar; c) – g) maddeleri uygulanabildiği ölçüde yapılır. Testler standartta önerilen sırayla yapılmıştır.',
-      progCols: ['Madde', 'Test', 'Kapsam', 'Kabul kriteri', 'Adet', 'Sonuç'], critLabel: 'Kabul kriteri',
-      req: 'zorunlu', opt: 'uygulanabilir',
+      progCols: ['Madde', 'Test', 'Kapsam', 'Kabul kriteri', 'Ölçülen', 'Sonuç'], critLabel: 'Kabul kriteri',
+      req: 'zorunlu', opt: 'uygulanabilir', extra: 'ek test', mode: { on: 'aktif test', off: 'pasif test' },
       crit: {
         visual: 'Uygunsuzluk bulunmamalı',
-        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (${l.rpeI} A · ${l.rpeT} s)`,
+        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (I ≥ ${l.rpeI} A · ${l.rpeT} s)`,
+        vd: 'ΔU ≤ ΔU<sub>max</sub> (EN 60204-1:2006 Tablo 9 ya da satırdaki sınır)',
         loop: 'Z<sub>s</sub> · I<sub>a</sub> ≤ U<sub>0</sub>',
-        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC)`,
-        hv: (l) => `${l.hvU} V AC · ${l.hvT} s; delinme yok (I ≤ ${l.hvMax} mA)`,
+        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC ±${l.isoTol} V)`,
+        hv: (l) => `${l.hvU} V AC (±${l.hvTol} V) · ${l.hvT} s; delinme yok (I ≤ ${l.hvMax} mA)`,
+        pwr: (l) => `U = U<sub>n</sub> ±${l.uTol} %; I ≤ etiketteki tam yük akımı`,
         res: (l) => `U ≤ ${l.resMax} V, ${l.resT} s içinde`,
         leak: (l) => `I<sub>PE</sub> ≤ ${l.leakMax} mA; aşılırsa §8.2.6 önlemleri`,
         func: 'Tüm fonksiyonlar beklendiği gibi çalışmalı'
@@ -299,14 +326,14 @@
       p75: (l) => `Besleme kesildikten sonra gerilimli kalabilen erişilebilir parçalarda (fiş uçları, pano içi) gerilim ölçülmüştür. Kabul kriteri: besleme kesildikten sonra ${l.resT} s içinde ≤ ${l.resMax} V (fiş uçlarında 1 s).`,
       h76: 'Koruma iletkeni akımı (§8.2.6)',
       p76: (l) => `Makine çalışır durumdayken koruma iletkeni akımı ölçülmüştür. Akım ${l.leakMax} mA'i aşmıyorsa §8.2.6'daki ek gereklilikler (en az 10 mm² Cu koruma iletkeni, ikinci koruma iletkeni veya koruma iletkeni kopunca otomatik kesme ve uyarı) uygulanmaz.`,
-      cols: { no: 'No', time: 'Saat', point: 'Ölçüm noktası', circuit: 'Ölçülen devre', itest: 'I<sub>test</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>ölçülen</sub>', limit: 'Limit', ev: 'Değ.', photo: 'Foto', device: 'Koruma cihazı', zs: 'Z<sub>s</sub> ölçülen', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>' },
+      cols: { no: 'No', time: 'Saat', point: 'Ölçüm noktası', circuit: 'Ölçülen devre', itest: 'I<sub>test</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>ölçülen</sub>', limit: 'Limit', ev: 'Değ.', photo: 'Foto', device: 'Koruma cihazı', zs: 'Z<sub>s</sub> ölçülen', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>', imeas: 'I<sub>ölçülen</sub>', cs: 'Kesit', du: 'ΔU', i: 'I', state: 'Çalışma durumu', dun: 'Sapma', pf: 'cos φ', p: 'P', s: 'S', q: 'Q' },
       status: { site: 'Kurulum yerinde, makine nihai beslemeye bağlandıktan sonra yapılacaktır.', na: 'Uygulanamaz.', skip: 'Bu revizyonda yapılmamıştır.', none: 'Bu revizyonda ölçüm yapılmamıştır.' },
       s8: 'Fonksiyon Testleri', s8ref: '(EN 60204-1 §18.6)',
       p8: 'Elektrik donanımının fonksiyonları, özellikle güvenlik ve koruma ile ilgili olanlar, denenmiştir.',
       funcCols: ['No', 'Test', 'Beklenen sonuç', 'Sonuç', 'Tarih', 'Not'],
       sfRef: 'Risk analizi',
       s9: 'Sonuç ve Onay',
-      conclCols: ['Madde', 'Test', 'Sonuç'],
+      conclCols: ['Madde', 'Test', 'Ölçülen değer aralığı', 'Sınır', 'Sonuç'],
       verdict: {
         pass: (m) => `<b>${m}</b> makinesinin elektrik donanımı, EN 60204-1:2018 Bölüm 18'e göre yapılan doğrulamada <b>uygun</b> bulunmuştur.`,
         cond: (m, x) => `<b>${m}</b> makinesinin elektrik donanımı yapılan testlerde uygun bulunmuştur; ${x} tamamlanmalıdır.`,
@@ -316,13 +343,45 @@
       signTitle: 'Onay', signCols: ['', 'Ad Soyad', 'Unvan', 'Tarih', 'İmza'],
       pill: { pass: 'UYGUN', fail: 'UYGUN DEĞİL', open: 'AÇIK', na: 'UY', site: 'KURULUMDA', skip: 'YAPILMADI', warn: 'KOŞULLU' },
       sA: 'Ölçüm Ekranları', sB: 'Makine ve Test Kurulumu Fotoğrafları',
-      aGroups: { rpe: 'Koruyucu bağlama devresi sürekliliği (R<sub>PE</sub>)', loop: 'Hata döngüsü empedansı (Z<sub>s</sub>)', iso: 'Yalıtım direnci (R<sub>ISO</sub>)', hv: 'Gerilim testi (HV)', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı (I<sub>PE</sub>)' }
+      aGroups: { rpe: 'Koruyucu bağlama devresi sürekliliği (R<sub>PE</sub>)', vd: 'Koruyucu bağlama devresinde gerilim düşümü (ΔU)', loop: 'Hata döngüsü empedansı (Z<sub>s</sub>)', iso: 'Yalıtım direnci (R<sub>ISO</sub>)', hv: 'Gerilim testi (HV)', res: 'Artık gerilim', leak: 'Koruma iletkeni akımı (I<sub>PE</sub>)', pwr: 'Çalışma testi (güç ölçümü)' },
+      std60204: 'EN 60204-1:2018 (IEC 60204-1:2016), elle taşınmayan makinelerin ve birlikte çalışan makine gruplarının elektrik, elektronik ve programlanabilir elektronik donanımına, besleme bağlantı noktasından itibaren uygulanmaktadır. Standart, anma besleme gerilimi 1000 V AC ya da 1500 V DC\'yi ve anma frekansı 200 Hz\'i aşmayan donanımları kapsamakta, elektrik donanımının doğrulanmasını Bölüm 18\'de tanımlamaktadır.',
+      activePassive: '<b>Aktif test:</b> makine enerjiliyken yapılan testler — çalışma testi (makine en yüksek kapasitede çalışırken gerilim, akım ve güç ölçümü), koruma iletkeni akımı, artık gerilim, Test 2 ve fonksiyon testleri. <b>Pasif test:</b> besleme kesilmişken yapılan testler — gözle kontrol, koruyucu bağlama devresinin sürekliliği ve gerilim düşümü, yalıtım direnci ve gerilim testi.',
+      h7vd: 'Koruyucu bağlama devresinde gerilim düşümü — yüksek test akımı (§18.2.2 · §8.2.2)',
+      p7vd: () => 'Koruyucu bağlama devresinin akım taşıma yeterliliği, PE terminali ile ilgili noktalar arasında yüksek test akımıyla (≈ 10 A) oluşan gerilim düşümü ölçülerek doğrulanmıştır. Kesit verilmişse sınır EN 60204-1:2006 Tablo 9 değerlerinden (10 A için: 1,0 mm² → 3,3 V · 1,5 mm² → 2,6 V · 2,5 mm² → 1,9 V · 4,0 mm² → 1,4 V · ≥ 6 mm² → 1,0 V) test akımına oranlanarak hesaplanmış, aksi hâlde satırda verilen sınır kullanılmıştır.',
+      h7pwr: 'Çalışma testi — besleme gerilimi, akım ve güç (aktif test, §4.3.2 · §16.4)',
+      p7pwr: (l) => `Makine enerjilenmiş ve en yüksek kapasitede çalıştırılmıştır; çalışma sırasında besleme gerilimi, akım, güç faktörü ile aktif, görünür ve reaktif güç ölçülmüştür. Besleme gerilimi nominal gerilimle karşılaştırılmıştır (EN 60204-1 §4.3.2: kararlı durumda nominal gerilimin %90 – %110'u; kabul ±${l.uTol} %). Ölçülen en yüksek akım makine etiketindeki tam yük akımıyla karşılaştırılmıştır (§16.4).`,
+      un: 'Nominal gerilim',
+      evl: {
+        what: { rpe: 'R<sub>PE</sub>', vd: 'gerilim düşümü', loop: 'Z<sub>s</sub>', iso: 'R<sub>ISO</sub>', hv: 'kaçak akım', res: 'artık gerilim', leak: 'koruma iletkeni akımı' },
+        meas: (n, what, rng) => `${n} ölçümde ${what} ${rng} olarak ölçülmüştür.`,
+        allOk: (lim) => `Tüm değerler kabul kriterini (${lim}) sağlamaktadır.`,
+        someFail: (f, lim, list) => `${f} ölçüm kabul kriterini (${lim}) sağlamamaktadır: ${list}.`,
+        tolFail: (list) => `Uygulanan test akımı / gerilimi tolerans dışındadır: ${list}.`,
+        hvOk: 'Test süresince delinme veya atlama kaydedilmemiştir.',
+        leakWarn: (lim) => `Koruma iletkeni akımı ${lim} mA'i aşmaktadır; §8.2.6 ek önlemleri ve PE terminali yanında uyarı gereklidir (G-15).`,
+        pwr: (parts) => `Çalışma sırasında ${parts.join(', ')} ölçülmüştür.`,
+        pwrU: (u, un, du) => `besleme gerilimi ${u} (nominal ${un}, sapma ${du})`,
+        pwrI: (i, ir) => `en yüksek akım ${i}${ir ? ` (etiket: ${ir})` : ''}`,
+        pwrPf: (v) => `güç faktörü ${v}`,
+        pwrP: (p, s, q) => `aktif güç ${p}${s ? `, görünür güç ${s}` : ''}${q ? `, reaktif güç ${q}` : ''}`,
+        res: { pass: 'Sonuç: <b>uygun</b>.', fail: 'Sonuç: <b>uygun değil</b>.', warn: 'Sonuç: <b>koşullu</b> (§8.2.6).', open: 'Sonuç: <b>açık</b> (eksik değer).' }
+      },
+      tab: 'Tablo', fig: 'Şekil', lot: 'Tablolar', lof: 'Şekiller',
+      tbl: { mach: 'Makine ve elektrik beslemesi', cond: 'Test koşulları', dev: 'Test cihazları', prog: 'Test programı ve sonuç özeti (EN 60204-1 §18.1)', vis: 'Gözle kontrol ve dokümantasyon doğrulaması', rpe: 'Koruyucu bağlama devresinin sürekliliği — ölçüm sonuçları', vd: 'Gerilim düşümü — ölçüm sonuçları', loop: 'Hata döngüsü empedansı — ölçüm sonuçları', iso: 'Yalıtım direnci — ölçüm sonuçları', hv: 'Gerilim testi — ölçüm sonuçları', res: 'Artık gerilim — ölçüm sonuçları', leak: 'Koruma iletkeni akımı — ölçüm sonuçları', pwr: 'Çalışma testi — ölçülen değerler', func: 'Fonksiyon testleri', sum: 'Sonuç özeti', sign: 'Onay' },
+      figA: (g) => `${g} — ölçüm ekranları`, figB: 'Makine, etiket ve test kurulumu fotoğrafları',
+      discTitle: 'Geçerlilik ve yasal uyarı',
+      disc: [
+        'Bu rapor yalnız yukarıda tanımlanan makineyi ve belirtilen koşullarda, test tarihinde yapılan testleri kapsamaktadır. Makinenin tasarımında, bileşenlerinde, elektrik bağlantılarında veya çalışma koşullarında sonradan yapılan değişiklikler raporun geçerliliğini ortadan kaldırabilir.',
+        'Titreşim, sıcaklık değişimleri, nem, toz ve kullanım yoğunluğu zamanla elektrik bağlantılarının gevşemesine, iletken yüzeylerin korozyonuna ve yalıtımın yıpranmasına yol açabilir. Ölçüm sonuçları makinenin test anındaki durumunu yansıtmaktadır; sürekli uygunluğun kanıtı olarak kabul edilmemelidir.',
+        'Koruyucu bağlama devresinin etkinliği, makinenin bağlandığı tesisin topraklama tesisatına da bağlıdır; tesis topraklaması ayrıca ölçülmeli ve kayıt altına alınmalıdır.',
+        'Makinenin kullanım ömrü boyunca iş sağlığı ve güvenliği mevzuatına ve EN 60204-1\'e uygunluğun sürdürülmesi işletenin sorumluluğundadır. Elektriksel güvenlik testlerinin yetkin personel tarafından periyodik olarak (tercihen en az yılda bir) tekrarlanması ve sonuçların kayıt altına alınması önerilmektedir. Elektrik donanımında değişiklik yapıldığında ilgili testler EN 60204-1 §18.7\'ye göre tekrarlanmalıdır.'
+      ]
     },
     en: {
       dec: '.', fill: '[to be filled]', none: '—',
-      hdrTitle: 'LVD Test Report', pageWord: 'Page', uncontrolled: 'Uncontrolled copy — do not reproduce', jobPrefix: 'Job No',
+      hdrTitle: 'Electrical Quality & Safety Test', pageWord: 'Page', uncontrolled: 'Uncontrolled copy — do not reproduce', jobPrefix: 'Job No',
       cover: {
-        kicker: 'ELECTRICAL SAFETY TEST REPORT', mark: 'LVD', std: '2014/35/EU<br>EN 60204-1:2018<br>Clause 18<br>IEC 61557',
+        kicker: 'ELECTRICAL SYSTEM QUALITY & SAFETY TEST REPORT', mark: 'LVD', std: '2014/35/EU<br>EN 60204-1:2018<br>Clause 18<br>IEC 61557',
         rows: { job: 'Job no', customer: 'Customer', model: 'Model', serial: 'Machine serial no', docNo: 'Report no', rev: 'Revision', date: 'Test date', pages: 'Pages' },
         sign: ['Prepared by', 'Checked by', 'Approved by']
       },
@@ -346,20 +405,22 @@
       s3: 'Machine and Electrical Supply',
       mach: { manufacturer: 'Manufacturer', model: 'Brand / model', serial: 'Serial no / year', type: 'Machine type', supply: 'Supply (voltage / phases / frequency)', current: 'Rated (full-load) current', power: 'Installed power', network: 'Supply system', fuse: 'Upstream protection (fuse)', sccr: 'Short-circuit rating', protClass: 'Protection class', ip: 'Degree of protection (IP)', connection: 'Supply connection' },
       s4: 'Test Conditions and Test Equipment',
-      cond: { date: 'Test date / time', location: 'Test location', ambient: 'Ambient conditions', testedBy: 'Tested by', connection: 'Connection', method: 'Method' },
+      cond: { date: 'Test date / time', location: 'Test location', temp: 'Ambient temperature', hum: 'Relative humidity', ambient: 'Ambient conditions', testedBy: 'Tested by', connection: 'Connection', method: 'Method' },
       devTitle: 'Test equipment', devCols: ['Instrument', 'Brand / model', 'Serial no', 'Calibration', 'Valid until', 'Status'],
       devNote: 'EN 60204-1 §18.1 specifies measuring equipment in accordance with the IEC 61557 series for the tests of §18.2 and §18.3.',
       calOk: 'valid', calExp: 'expired',
       s5: 'Test Programme and Summary of Results',
       p5: 'According to EN 60204-1 §18.1, where there is no dedicated product standard for the machine, the verification shall include at least items a), b) and h); items c) – g) are performed as applicable. The tests have been performed in the sequence recommended by the standard.',
-      progCols: ['Item', 'Test', 'Scope', 'Acceptance criterion', 'Qty', 'Result'], critLabel: 'Acceptance criterion',
-      req: 'mandatory', opt: 'as applicable',
+      progCols: ['Item', 'Test', 'Scope', 'Acceptance criterion', 'Measured', 'Result'], critLabel: 'Acceptance criterion',
+      req: 'mandatory', opt: 'as applicable', extra: 'additional test', mode: { on: 'active test', off: 'passive test' },
       crit: {
         visual: 'No non-conformity',
-        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (${l.rpeI} A · ${l.rpeT} s)`,
+        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (I ≥ ${l.rpeI} A · ${l.rpeT} s)`,
+        vd: 'ΔU ≤ ΔU<sub>max</sub> (EN 60204-1:2006 Table 9 or limit stated in the row)',
         loop: 'Z<sub>s</sub> · I<sub>a</sub> ≤ U<sub>0</sub>',
-        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC)`,
-        hv: (l) => `${l.hvU} V AC · ${l.hvT} s; no breakdown (I ≤ ${l.hvMax} mA)`,
+        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC ±${l.isoTol} V)`,
+        hv: (l) => `${l.hvU} V AC (±${l.hvTol} V) · ${l.hvT} s; no breakdown (I ≤ ${l.hvMax} mA)`,
+        pwr: (l) => `U = U<sub>n</sub> ±${l.uTol} %; I ≤ full-load current on the nameplate`,
         res: (l) => `U ≤ ${l.resMax} V within ${l.resT} s`,
         leak: (l) => `I<sub>PE</sub> ≤ ${l.leakMax} mA; otherwise measures of §8.2.6`,
         func: 'All functions operate as intended'
@@ -382,14 +443,14 @@
       p75: (l) => `The voltage has been measured on accessible parts that may remain live after disconnection of the supply (plug pins, inside the enclosure). Acceptance criterion: ≤ ${l.resMax} V within ${l.resT} s after disconnection (1 s at plug pins).`,
       h76: 'Protective conductor current (§8.2.6)',
       p76: (l) => `The protective conductor current has been measured with the machine in operation. If it does not exceed ${l.leakMax} mA, the additional requirements of §8.2.6 (protective conductor of at least 10 mm² Cu, a second protective conductor or automatic disconnection on loss of the protective conductor, and a warning) do not apply.`,
-      cols: { no: 'No', time: 'Time', point: 'Measuring point', circuit: 'Circuit measured', itest: 'I<sub>test</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>measured</sub>', limit: 'Limit', ev: 'Eval.', photo: 'Photo', device: 'Protective device', zs: 'Z<sub>s</sub> measured', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>' },
+      cols: { no: 'No', time: 'Time', point: 'Measuring point', circuit: 'Circuit measured', itest: 'I<sub>test</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>measured</sub>', limit: 'Limit', ev: 'Eval.', photo: 'Photo', device: 'Protective device', zs: 'Z<sub>s</sub> measured', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>', imeas: 'I<sub>measured</sub>', cs: 'Cross-section', du: 'ΔU', i: 'I', state: 'Operating state', dun: 'Deviation', pf: 'cos φ', p: 'P', s: 'S', q: 'Q' },
       status: { site: 'To be performed at the place of installation after connection to the final supply.', na: 'Not applicable.', skip: 'Not performed in this revision.', none: 'No measurement in this revision.' },
       s8: 'Functional Tests', s8ref: '(EN 60204-1 §18.6)',
       p8: 'The functions of the electrical equipment, particularly those related to safety and safeguarding, have been tested.',
       funcCols: ['No', 'Test', 'Expected result', 'Result', 'Date', 'Note'],
       sfRef: 'Risk assessment',
       s9: 'Conclusion and Approval',
-      conclCols: ['Item', 'Test', 'Result'],
+      conclCols: ['Item', 'Test', 'Measured value range', 'Limit', 'Result'],
       verdict: {
         pass: (m) => `The electrical equipment of the <b>${m}</b> machine has been found <b>compliant</b> in the verification according to EN 60204-1:2018 Clause 18.`,
         cond: (m, x) => `The electrical equipment of the <b>${m}</b> machine has been found compliant in the tests performed; ${x} shall be completed.`,
@@ -399,13 +460,45 @@
       signTitle: 'Approval', signCols: ['', 'Name', 'Title', 'Date', 'Signature'],
       pill: { pass: 'PASS', fail: 'FAIL', open: 'OPEN', na: 'N/A', site: 'ON SITE', skip: 'NOT DONE', warn: 'CONDITIONAL' },
       sA: 'Measurement Screens', sB: 'Machine and Test Set-up Photographs',
-      aGroups: { rpe: 'Protective bonding continuity (R<sub>PE</sub>)', loop: 'Fault loop impedance (Z<sub>s</sub>)', iso: 'Insulation resistance (R<sub>ISO</sub>)', hv: 'Voltage test (HV)', res: 'Residual voltage', leak: 'Protective conductor current (I<sub>PE</sub>)' }
+      aGroups: { rpe: 'Protective bonding continuity (R<sub>PE</sub>)', vd: 'Voltage drop in the protective bonding circuit (ΔU)', loop: 'Fault loop impedance (Z<sub>s</sub>)', iso: 'Insulation resistance (R<sub>ISO</sub>)', hv: 'Voltage test (HV)', res: 'Residual voltage', leak: 'Protective conductor current (I<sub>PE</sub>)', pwr: 'Operating test (power measurement)' },
+      std60204: 'EN 60204-1:2018 (IEC 60204-1:2016) applies to the electrical, electronic and programmable electronic equipment and systems of machines not portable by hand while working, including groups of machines working together in a coordinated manner, starting from the point of connection of the supply. It covers equipment with nominal supply voltages not exceeding 1000 V AC or 1500 V DC and nominal supply frequencies not exceeding 200 Hz, and specifies the verification of the electrical equipment in Clause 18.',
+      activePassive: '<b>Active test:</b> tests performed with the machine energised — operating test (measurement of voltage, current and power with the machine running at maximum capacity), protective conductor current, residual voltage, Test 2 and functional tests. <b>Passive test:</b> tests performed with the supply disconnected — visual inspection, continuity and voltage drop of the protective bonding circuit, insulation resistance and voltage test.',
+      h7vd: 'Voltage drop in the protective bonding circuit — high test current (§18.2.2 · §8.2.2)',
+      p7vd: () => 'The current-carrying capability of the protective bonding circuit has been verified by measuring the voltage drop between the PE terminal and the relevant points at a high test current (≈ 10 A). Where the cross-section is given, the limit has been derived from EN 60204-1:2006 Table 9 (for 10 A: 1.0 mm² → 3.3 V · 1.5 mm² → 2.6 V · 2.5 mm² → 1.9 V · 4.0 mm² → 1.4 V · ≥ 6 mm² → 1.0 V) in proportion to the test current; otherwise the limit stated in the row has been used.',
+      h7pwr: 'Operating test — supply voltage, current and power (active test, §4.3.2 · §16.4)',
+      p7pwr: (l) => `The machine has been energised and operated at maximum capacity; supply voltage, current, power factor and active, apparent and reactive power have been measured during operation. The supply voltage has been compared with the nominal voltage (EN 60204-1 §4.3.2: steady-state voltage 90 % to 110 % of nominal; acceptance ±${l.uTol} %). The maximum measured current has been compared with the full-load current on the nameplate (§16.4).`,
+      un: 'Nominal voltage',
+      evl: {
+        what: { rpe: 'R<sub>PE</sub>', vd: 'the voltage drop', loop: 'Z<sub>s</sub>', iso: 'R<sub>ISO</sub>', hv: 'the leakage current', res: 'the residual voltage', leak: 'the protective conductor current' },
+        meas: (n, what, rng) => `In ${n} measurement${n > 1 ? 's' : ''} ${what} was ${rng}.`,
+        allOk: (lim) => `All values meet the acceptance criterion (${lim}).`,
+        someFail: (f, lim, list) => `${f} measurement${f > 1 ? 's do' : ' does'} not meet the acceptance criterion (${lim}): ${list}.`,
+        tolFail: (list) => `The applied test current / voltage is out of tolerance: ${list}.`,
+        hvOk: 'No breakdown or flashover was recorded during the test.',
+        leakWarn: (lim) => `The protective conductor current exceeds ${lim} mA; the additional measures of §8.2.6 and a warning next to the PE terminal are required (G-15).`,
+        pwr: (parts) => `During operation ${parts.join(', ')} were measured.`,
+        pwrU: (u, un, du) => `a supply voltage of ${u} (nominal ${un}, deviation ${du})`,
+        pwrI: (i, ir) => `a maximum current of ${i}${ir ? ` (nameplate: ${ir})` : ''}`,
+        pwrPf: (v) => `a power factor of ${v}`,
+        pwrP: (p, s, q) => `an active power of ${p}${s ? `, an apparent power of ${s}` : ''}${q ? `, a reactive power of ${q}` : ''}`,
+        res: { pass: 'Result: <b>compliant</b>.', fail: 'Result: <b>not compliant</b>.', warn: 'Result: <b>conditional</b> (§8.2.6).', open: 'Result: <b>open</b> (values missing).' }
+      },
+      tab: 'Table', fig: 'Figure', lot: 'List of tables', lof: 'List of figures',
+      tbl: { mach: 'Machine and electrical supply', cond: 'Test conditions', dev: 'Test equipment', prog: 'Test programme and summary of results (EN 60204-1 §18.1)', vis: 'Visual inspection and verification of documentation', rpe: 'Continuity of the protective bonding circuit — results', vd: 'Voltage drop — results', loop: 'Fault loop impedance — results', iso: 'Insulation resistance — results', hv: 'Voltage test — results', res: 'Residual voltage — results', leak: 'Protective conductor current — results', pwr: 'Operating test — measured values', func: 'Functional tests', sum: 'Summary of results', sign: 'Approval' },
+      figA: (g) => `${g} — measurement screens`, figB: 'Machine, nameplate and test set-up photographs',
+      discTitle: 'Validity and legal disclaimer',
+      disc: [
+        'This report applies solely to the machine identified above and covers the tests performed under the stated conditions on the stated test date. Subsequent modifications to the design, components, electrical connections or operating conditions of the machine may invalidate this report.',
+        'Vibration, temperature fluctuations, humidity, dust and intensity of use may, over time, cause loosening of electrical connections, corrosion of conductive surfaces and deterioration of insulation. The measurement results reflect the condition of the machine at the time of testing and shall not be regarded as proof of continued compliance.',
+        'The effectiveness of the protective bonding circuit also depends on the earthing system of the installation to which the machine is connected; the earthing of the installation shall be measured and documented separately.',
+        'Maintaining compliance with occupational health and safety legislation and with EN 60204-1 throughout the service life of the machine is the responsibility of the operator. It is recommended that the electrical safety tests be repeated periodically (preferably at least once a year) by competent personnel and that the results be recorded. When the electrical equipment is modified, the relevant tests shall be repeated in accordance with EN 60204-1 §18.7.'
+      ]
     },
     de: {
       dec: ',', fill: '[auszufüllen]', none: '—',
-      hdrTitle: 'LVD-Prüfbericht', pageWord: 'Seite', uncontrolled: 'Nicht gelenkte Kopie — nicht vervielfältigen', jobPrefix: 'Auftrag',
+      hdrTitle: 'Elektrische Qualitäts- und Sicherheitsprüfung', pageWord: 'Seite', uncontrolled: 'Nicht gelenkte Kopie — nicht vervielfältigen', jobPrefix: 'Auftrag',
       cover: {
-        kicker: 'PRÜFBERICHT ELEKTRISCHE SICHERHEIT', mark: 'LVD', std: '2014/35/EU<br>EN 60204-1:2018<br>Abschnitt 18<br>IEC 61557',
+        kicker: 'PRÜFBERICHT QUALITÄT UND SICHERHEIT DER ELEKTRISCHEN ANLAGE', mark: 'LVD', std: '2014/35/EU<br>EN 60204-1:2018<br>Abschnitt 18<br>IEC 61557',
         rows: { job: 'Auftrags-Nr.', customer: 'Kunde', model: 'Modell', serial: 'Maschinen-Serien-Nr.', docNo: 'Bericht-Nr.', rev: 'Revision', date: 'Prüfdatum', pages: 'Seitenzahl' },
         sign: ['Erstellt', 'Geprüft', 'Freigegeben']
       },
@@ -429,20 +522,22 @@
       s3: 'Maschine und elektrische Versorgung',
       mach: { manufacturer: 'Hersteller', model: 'Marke / Modell', serial: 'Serien-Nr. / Baujahr', type: 'Maschinenart', supply: 'Versorgung (Spannung / Phasen / Frequenz)', current: 'Bemessungsstrom (Volllast)', power: 'Installierte Leistung', network: 'Netzform', fuse: 'Vorsicherung', sccr: 'Kurzschlussfestigkeit', protClass: 'Schutzklasse', ip: 'Schutzart (IP)', connection: 'Netzanschluss' },
       s4: 'Prüfbedingungen und Prüfmittel',
-      cond: { date: 'Prüfdatum / Uhrzeit', location: 'Prüfort', ambient: 'Umgebungsbedingungen', testedBy: 'Prüfer', connection: 'Anschluss', method: 'Verfahren' },
+      cond: { date: 'Prüfdatum / Uhrzeit', location: 'Prüfort', temp: 'Umgebungstemperatur', hum: 'Relative Luftfeuchte', ambient: 'Umgebungsbedingungen', testedBy: 'Prüfer', connection: 'Anschluss', method: 'Verfahren' },
       devTitle: 'Prüfmittel', devCols: ['Gerät', 'Marke / Modell', 'Serien-Nr.', 'Kalibrierung', 'Gültig bis', 'Status'],
       devNote: 'EN 60204-1 §18.1 sieht für die Prüfungen nach §18.2 und §18.3 Messgeräte nach der Normenreihe IEC 61557 vor.',
       calOk: 'gültig', calExp: 'abgelaufen',
       s5: 'Prüfprogramm und Ergebnisübersicht',
       p5: 'Nach EN 60204-1 §18.1 umfasst die Prüfung, wenn keine Produktnorm für die Maschine besteht, mindestens die Punkte a), b) und h); die Punkte c) – g) werden soweit anwendbar durchgeführt. Die Prüfungen wurden in der von der Norm empfohlenen Reihenfolge durchgeführt.',
-      progCols: ['Punkt', 'Prüfung', 'Umfang', 'Annahmekriterium', 'Anz.', 'Ergebnis'], critLabel: 'Annahmekriterium',
-      req: 'verpflichtend', opt: 'soweit anwendbar',
+      progCols: ['Punkt', 'Prüfung', 'Umfang', 'Annahmekriterium', 'Gemessen', 'Ergebnis'], critLabel: 'Annahmekriterium',
+      req: 'verpflichtend', opt: 'soweit anwendbar', extra: 'zusätzliche Prüfung', mode: { on: 'aktive Prüfung', off: 'passive Prüfung' },
       crit: {
         visual: 'Keine Abweichung',
-        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (${l.rpeI} A · ${l.rpeT} s)`,
+        rpe: (l) => `R<sub>PE</sub> ≤ ${l.rpeMax} Ω (I ≥ ${l.rpeI} A · ${l.rpeT} s)`,
+        vd: 'ΔU ≤ ΔU<sub>max</sub> (EN 60204-1:2006 Tabelle 9 oder Grenzwert in der Zeile)',
         loop: 'Z<sub>s</sub> · I<sub>a</sub> ≤ U<sub>0</sub>',
-        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC)`,
-        hv: (l) => `${l.hvU} V AC · ${l.hvT} s; kein Durchschlag (I ≤ ${l.hvMax} mA)`,
+        iso: (l) => `R<sub>ISO</sub> ≥ ${l.isoMin} MΩ (${l.isoU} V DC ±${l.isoTol} V)`,
+        hv: (l) => `${l.hvU} V AC (±${l.hvTol} V) · ${l.hvT} s; kein Durchschlag (I ≤ ${l.hvMax} mA)`,
+        pwr: (l) => `U = U<sub>n</sub> ±${l.uTol} %; I ≤ Volllaststrom laut Typschild`,
         res: (l) => `U ≤ ${l.resMax} V innerhalb ${l.resT} s`,
         leak: (l) => `I<sub>PE</sub> ≤ ${l.leakMax} mA; sonst Maßnahmen nach §8.2.6`,
         func: 'Alle Funktionen arbeiten bestimmungsgemäß'
@@ -465,14 +560,14 @@
       p75: (l) => `An berührbaren Teilen, die nach dem Abschalten der Versorgung Spannung führen können (Steckerstifte, im Schaltschrank), wurde die Spannung gemessen. Annahmekriterium: ≤ ${l.resMax} V innerhalb von ${l.resT} s nach dem Abschalten (an Steckerstiften 1 s).`,
       h76: 'Schutzleiterstrom (§8.2.6)',
       p76: (l) => `Der Schutzleiterstrom wurde bei laufender Maschine gemessen. Überschreitet er ${l.leakMax} mA nicht, entfallen die zusätzlichen Anforderungen nach §8.2.6 (Schutzleiter mindestens 10 mm² Cu, zweiter Schutzleiter oder automatische Abschaltung bei Unterbrechung des Schutzleiters sowie Warnhinweis).`,
-      cols: { no: 'Nr.', time: 'Uhrzeit', point: 'Messpunkt', circuit: 'Gemessener Stromkreis', itest: 'I<sub>Prüf</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>gemessen</sub>', limit: 'Grenzwert', ev: 'Bew.', photo: 'Foto', device: 'Schutzeinrichtung', zs: 'Z<sub>s</sub> gemessen', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>' },
+      cols: { no: 'Nr.', time: 'Uhrzeit', point: 'Messpunkt', circuit: 'Gemessener Stromkreis', itest: 'I<sub>Prüf</sub>', uiso: 'U<sub>ISO</sub>', umeas: 'U<sub>gemessen</sub>', limit: 'Grenzwert', ev: 'Bew.', photo: 'Foto', device: 'Schutzeinrichtung', zs: 'Z<sub>s</sub> gemessen', zsmax: 'Z<sub>s,max</sub>', t: 't', u: 'U', ipe: 'I<sub>PE</sub>', imeas: 'I<sub>gemessen</sub>', cs: 'Querschnitt', du: 'ΔU', i: 'I', state: 'Betriebszustand', dun: 'Abweichung', pf: 'cos φ', p: 'P', s: 'S', q: 'Q' },
       status: { site: 'Wird am Aufstellungsort nach Anschluss an die endgültige Versorgung durchgeführt.', na: 'Entfällt.', skip: 'In dieser Revision nicht durchgeführt.', none: 'In dieser Revision keine Messung.' },
       s8: 'Funktionsprüfungen', s8ref: '(EN 60204-1 §18.6)',
       p8: 'Die Funktionen der elektrischen Ausrüstung, insbesondere die sicherheitsbezogenen und schützenden, wurden geprüft.',
       funcCols: ['Nr.', 'Prüfung', 'Erwartetes Ergebnis', 'Ergebnis', 'Datum', 'Hinweis'],
       sfRef: 'Risikobeurteilung',
       s9: 'Ergebnis und Freigabe',
-      conclCols: ['Punkt', 'Prüfung', 'Ergebnis'],
+      conclCols: ['Punkt', 'Prüfung', 'Messwertbereich', 'Grenzwert', 'Ergebnis'],
       verdict: {
         pass: (m) => `Die elektrische Ausrüstung der Maschine <b>${m}</b> wurde bei der Prüfung nach EN 60204-1:2018 Abschnitt 18 als <b>in Ordnung</b> befunden.`,
         cond: (m, x) => `Die elektrische Ausrüstung der Maschine <b>${m}</b> wurde in den durchgeführten Prüfungen als in Ordnung befunden; ${x} ist abzuschließen.`,
@@ -482,9 +577,41 @@
       signTitle: 'Freigabe', signCols: ['', 'Name', 'Funktion', 'Datum', 'Unterschrift'],
       pill: { pass: 'i.O.', fail: 'n.i.O.', open: 'OFFEN', na: 'ENTF.', site: 'VOR ORT', skip: 'NICHT DURCHGEF.', warn: 'BEDINGT' },
       sA: 'Messanzeigen', sB: 'Fotos der Maschine und des Prüfaufbaus',
-      aGroups: { rpe: 'Durchgängigkeit des Schutzleitersystems (R<sub>PE</sub>)', loop: 'Fehlerschleifenimpedanz (Z<sub>s</sub>)', iso: 'Isolationswiderstand (R<sub>ISO</sub>)', hv: 'Spannungsprüfung (HV)', res: 'Restspannung', leak: 'Schutzleiterstrom (I<sub>PE</sub>)' }
+      aGroups: { rpe: 'Durchgängigkeit des Schutzleitersystems (R<sub>PE</sub>)', vd: 'Spannungsfall im Schutzleitersystem (ΔU)', loop: 'Fehlerschleifenimpedanz (Z<sub>s</sub>)', iso: 'Isolationswiderstand (R<sub>ISO</sub>)', hv: 'Spannungsprüfung (HV)', res: 'Restspannung', leak: 'Schutzleiterstrom (I<sub>PE</sub>)', pwr: 'Betriebsprüfung (Leistungsmessung)' },
+      std60204: 'EN 60204-1:2018 (IEC 60204-1:2016) gilt für die elektrische, elektronische und programmierbare elektronische Ausrüstung und Systeme von Maschinen, die während des Betriebs nicht von Hand getragen werden, einschließlich zusammenwirkender Maschinengruppen, beginnend an der Anschlussstelle der Versorgung. Sie erfasst Ausrüstungen mit Bemessungsspannungen bis 1000 V AC bzw. 1500 V DC und Bemessungsfrequenzen bis 200 Hz und legt in Abschnitt 18 die Prüfung der elektrischen Ausrüstung fest.',
+      activePassive: '<b>Aktive Prüfung:</b> Prüfungen an der eingeschalteten Maschine — Betriebsprüfung (Messung von Spannung, Strom und Leistung bei maximaler Auslastung), Schutzleiterstrom, Restspannung, Prüfung 2 und Funktionsprüfungen. <b>Passive Prüfung:</b> Prüfungen bei abgeschalteter Versorgung — Sichtprüfung, Durchgängigkeit und Spannungsfall des Schutzleitersystems, Isolationswiderstand und Spannungsprüfung.',
+      h7vd: 'Spannungsfall im Schutzleitersystem — hoher Prüfstrom (§18.2.2 · §8.2.2)',
+      p7vd: () => 'Die Strombelastbarkeit des Schutzleitersystems wurde durch Messung des Spannungsfalls zwischen der PE-Klemme und den jeweiligen Punkten bei hohem Prüfstrom (≈ 10 A) nachgewiesen. Ist der Querschnitt angegeben, wurde der Grenzwert aus EN 60204-1:2006 Tabelle 9 (für 10 A: 1,0 mm² → 3,3 V · 1,5 mm² → 2,6 V · 2,5 mm² → 1,9 V · 4,0 mm² → 1,4 V · ≥ 6 mm² → 1,0 V) im Verhältnis zum Prüfstrom berechnet; andernfalls wurde der in der Zeile angegebene Grenzwert verwendet.',
+      h7pwr: 'Betriebsprüfung — Versorgungsspannung, Strom und Leistung (aktive Prüfung, §4.3.2 · §16.4)',
+      p7pwr: (l) => `Die Maschine wurde eingeschaltet und mit maximaler Auslastung betrieben; während des Betriebs wurden Versorgungsspannung, Strom, Leistungsfaktor sowie Wirk-, Schein- und Blindleistung gemessen. Die Versorgungsspannung wurde mit der Nennspannung verglichen (EN 60204-1 §4.3.2: stationäre Spannung 90 % bis 110 % der Nennspannung; Annahme ±${l.uTol} %). Der höchste gemessene Strom wurde mit dem Volllaststrom auf dem Typschild verglichen (§16.4).`,
+      un: 'Nennspannung',
+      evl: {
+        what: { rpe: 'R<sub>PE</sub>', vd: 'der Spannungsfall', loop: 'Z<sub>s</sub>', iso: 'R<sub>ISO</sub>', hv: 'der Ableitstrom', res: 'die Restspannung', leak: 'der Schutzleiterstrom' },
+        meas: (n, what, rng) => `Bei ${n} Messung${n > 1 ? 'en' : ''} betrug ${what} ${rng}.`,
+        allOk: (lim) => `Alle Werte erfüllen das Annahmekriterium (${lim}).`,
+        someFail: (f, lim, list) => `${f} Messung${f > 1 ? 'en erfüllen' : ' erfüllt'} das Annahmekriterium (${lim}) nicht: ${list}.`,
+        tolFail: (list) => `Der angelegte Prüfstrom / die Prüfspannung liegt außerhalb der Toleranz: ${list}.`,
+        hvOk: 'Während der Prüfung wurde kein Durchschlag oder Überschlag festgestellt.',
+        leakWarn: (lim) => `Der Schutzleiterstrom überschreitet ${lim} mA; die zusätzlichen Maßnahmen nach §8.2.6 und ein Warnhinweis an der PE-Klemme sind erforderlich (G-15).`,
+        pwr: (parts) => `Während des Betriebs wurden ${parts.join(', ')} gemessen.`,
+        pwrU: (u, un, du) => `eine Versorgungsspannung von ${u} (Nenn ${un}, Abweichung ${du})`,
+        pwrI: (i, ir) => `ein Höchststrom von ${i}${ir ? ` (Typschild: ${ir})` : ''}`,
+        pwrPf: (v) => `ein Leistungsfaktor von ${v}`,
+        pwrP: (p, s, q) => `eine Wirkleistung von ${p}${s ? `, eine Scheinleistung von ${s}` : ''}${q ? `, eine Blindleistung von ${q}` : ''}`,
+        res: { pass: 'Ergebnis: <b>in Ordnung</b>.', fail: 'Ergebnis: <b>nicht in Ordnung</b>.', warn: 'Ergebnis: <b>bedingt</b> (§8.2.6).', open: 'Ergebnis: <b>offen</b> (Werte fehlen).' }
+      },
+      tab: 'Tabelle', fig: 'Bild', lot: 'Tabellenverzeichnis', lof: 'Abbildungsverzeichnis',
+      tbl: { mach: 'Maschine und elektrische Versorgung', cond: 'Prüfbedingungen', dev: 'Prüfmittel', prog: 'Prüfprogramm und Ergebnisübersicht (EN 60204-1 §18.1)', vis: 'Sichtprüfung und Prüfung der Dokumentation', rpe: 'Durchgängigkeit des Schutzleitersystems — Ergebnisse', vd: 'Spannungsfall — Ergebnisse', loop: 'Fehlerschleifenimpedanz — Ergebnisse', iso: 'Isolationswiderstand — Ergebnisse', hv: 'Spannungsprüfung — Ergebnisse', res: 'Restspannung — Ergebnisse', leak: 'Schutzleiterstrom — Ergebnisse', pwr: 'Betriebsprüfung — Messwerte', func: 'Funktionsprüfungen', sum: 'Ergebnisübersicht', sign: 'Freigabe' },
+      figA: (g) => `${g} — Messanzeigen`, figB: 'Fotos der Maschine, des Typschilds und des Prüfaufbaus',
+      discTitle: 'Gültigkeit und rechtlicher Hinweis',
+      disc: [
+        'Dieser Bericht gilt ausschließlich für die oben bezeichnete Maschine und umfasst die unter den angegebenen Bedingungen am angegebenen Prüfdatum durchgeführten Prüfungen. Spätere Änderungen an Konstruktion, Bauteilen, elektrischen Anschlüssen oder Betriebsbedingungen der Maschine können die Gültigkeit dieses Berichts aufheben.',
+        'Vibrationen, Temperaturschwankungen, Feuchtigkeit, Staub und Nutzungsintensität können im Laufe der Zeit zum Lockern elektrischer Verbindungen, zur Korrosion leitfähiger Oberflächen und zur Alterung der Isolierung führen. Die Messergebnisse geben den Zustand der Maschine zum Zeitpunkt der Prüfung wieder und sind nicht als Nachweis einer dauerhaften Konformität zu betrachten.',
+        'Die Wirksamkeit des Schutzleitersystems hängt auch von der Erdungsanlage des Aufstellungsortes ab, an die die Maschine angeschlossen wird; die Erdung der Anlage ist gesondert zu messen und zu dokumentieren.',
+        'Die Aufrechterhaltung der Konformität mit den Arbeitsschutzvorschriften und der EN 60204-1 während der gesamten Lebensdauer der Maschine liegt in der Verantwortung des Betreibers. Es wird empfohlen, die elektrischen Sicherheitsprüfungen regelmäßig (vorzugsweise mindestens einmal jährlich) durch befähigtes Personal zu wiederholen und die Ergebnisse zu dokumentieren. Bei Änderungen an der elektrischen Ausrüstung sind die betroffenen Prüfungen nach EN 60204-1 §18.7 zu wiederholen.'
+      ]
     }
   };
 
-  return { L3, TESTS, MEAS, LIMITS, TRIP_K, GROUPS, VISUAL, FUNC, PHOTO_RULES, photoRule, photoName, PHOTO_KINDS, pairText, PAIRS_3N, T };
+  return { L3, TESTS, MEAS, LIMITS, TRIP_K, VD_TABLE, vdLimit, GROUPS, VISUAL, FUNC, PHOTO_RULES, photoRule, photoName, PHOTO_KINDS, pairText, PAIRS_3N, T };
 });
