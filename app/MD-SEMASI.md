@@ -63,7 +63,7 @@ uretici: CNK Elektronik Makine San. A.Ş.
 marka adi: Dolfin®
 marka satiri: Dolfin® Industrial Parts Washing Machines
 yil: 2026
-dokuman: RA-0326066-01      # yoksa RA-<no>-01
+dokuman: RA-0326066         # RA-<iş no>; yoksa bu yazılır. Rev ayrı alandır: numaraya eklenmez, numara revizyonla değişmez
 rev: 00
 sablon rev: 00              # yalnız model ve birim: şablonun revizyonu (aşağıya bakın)
 tarih: 22.10.2026           # rapor tarihi

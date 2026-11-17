@@ -439,7 +439,7 @@
     else if (!dn) add('warn', `Rapor no (${M.docNo}) LVD-<seri no>-<test sırası> biçiminde değil (ör. LVD-${M.serial || M.job || '0326066'}-00)`);
     else if (M.serial && dn.serial !== String(M.serial).trim()) add('warn', `Rapor no (${M.docNo}) makine seri noyla (${M.serial}) uyuşmuyor`);
     if (M.docNo && (o.docNos || []).includes(M.docNo)) add('error', `Rapor no ${M.docNo} başka bir LVD raporunda da kullanılıyor`);
-    const rd = /^RA-(.+)-(\d{2,})/.exec(String(M.riskDoc || '').trim());
+    const rd = /^RA-(.+?)(?:-\d{2,})?(?=\s|$)/.exec(String(M.riskDoc || '').trim());
     if (rd && dn && rd[1] !== dn.serial) add('warn', `Risk analizi no (${M.riskDoc}) ile rapor no (${M.docNo}) farklı makineyi gösteriyor (ortak gövde makine seri no olmalı)`);
     if (!m.machine.supply) add('warn', 'Besleme gerilimi / faz / frekans yazılmamış (Makine: besleme)');
     if (!m.cond.date) add('warn', 'Test tarihi yazılmamış (Test Koşulları: tarih)');

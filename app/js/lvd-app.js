@@ -217,17 +217,6 @@
       nav.insertBefore(b, nav.querySelector('.tb-spacer'));
       b.addEventListener('click', () => openList());
     }
-    const meas = $('btnMeasure');
-    if (meas && !$('btnLvdOpen')) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn btn-sm';
-      b.id = 'btnLvdOpen';
-      b.title = 'Bu makinenin LVD test raporu (EN 60204-1 Bölüm 18): varsa açılır, yoksa bu risk analizinden oluşturulur';
-      b.textContent = 'LVD';
-      meas.parentElement.insertBefore(b, meas);
-      b.addEventListener('click', fromRA);
-    }
     const host = document.createElement('div');
     host.id = 'lvd';
     host.className = 'lvd hidden';
@@ -248,7 +237,8 @@
       <div class="lvd-view hidden" id="lvdView">
         <header class="topbar">
           <button type="button" class="tb-logo" id="lvdHome" title="LVD raporları listesi"><img src="${esc(logo('assets/logos/dolfin.png'))}" alt="" id="lvdLogo"></button>
-          <span class="lvd-badge">LVD</span>
+          <span class="lvd-badge" id="lvdTopBadge">LVD</span>
+          <nav class="doc-switch hidden" id="lvdDocSwitch" aria-label="Bu makinenin raporları"></nav>
           <div class="tb-doc"><strong id="lvdTitle"></strong><span id="lvdState"></span></div>
           <div class="tb-spacer"></div>
           <div class="tb-group"><div class="lang-seg" id="lvdLang"></div></div>
@@ -377,7 +367,7 @@
       if (!x.m) return `<button type="button" class="project-card empty" data-lvd="${esc(x.path)}"><span class="pc-bar"></span><div class="pc-no">${esc(x.name)}</div><div class="pc-customer">lvd.md yok ya da okunamadı</div></button>`;
       const M = x.m.meta;
       const [c, t] = OVERALL[x.ev.overall];
-      const chips = [`<span class="pc-chip">Rev ${esc(M.rev || '00')}</span>`, M.status === 'final' ? '<span class="pc-chip ok">Yayın</span>' : '<span class="pc-chip">Taslak</span>', `<span class="pc-chip ${c === 'green' ? 'ok' : c === 'red' ? 'bad' : 'warn'}">${t}</span>`, M.link ? '<span class="pc-chip has">Risk analizine bağlı</span>' : ''].join('');
+      const chips = [`<span class="pc-chip">Rev ${esc(M.rev || '00')}</span>`, M.status === 'final' ? '<span class="pc-chip ok">Yayın</span>' : '<span class="pc-chip">Taslak</span>', `<span class="pc-chip ${c === 'green' ? 'ok' : c === 'red' ? 'bad' : 'warn'}">${t}</span>`, M.link ? `<span class="pc-chip has" title="Bağlı risk analizi: ${esc(M.link)}">${esc(M.riskDoc || 'Risk analizine bağlı')}</span>` : ''].join('');
       return `<button type="button" class="project-card lvd-card" data-lvd="${esc(x.path)}"><span class="pc-bar"></span>
         <div class="pc-no">${esc(M.job || x.name)}</div><div class="pc-model">${esc(M.model || '')}</div><div class="pc-customer">${esc(M.customer || '')}</div>
         <div class="pc-chips">${chips}</div>
@@ -528,7 +518,8 @@
     applyZoom();
     if (keepScroll) wrap.scrollTop = ratio * wrap.scrollHeight;
     const M = S.m.meta;
-    $('lvdTitle').textContent = `${M.docNo || 'LVD'} · ${M.model || ''}`;
+    $('lvdTitle').textContent = M.link ? `${M.serial || M.job || M.docNo} · ${M.model || ''}` : `${M.docNo || 'LVD'} · ${M.model || ''}`;
+    renderSwitch();
     $('lvdState').textContent = `${M.customer || ''} · Rev ${M.rev || '00'} · ${M.status === 'final' ? 'yayın' : 'taslak'} · LVD test raporu`;
     const brand = ((root.RA_LIB || {}).brands || {})[String(M.brand || 'DOLFIN').toUpperCase()];
     if (brand && brand.logo) $('lvdLogo').src = logo(brand.logo);
@@ -541,6 +532,29 @@
     renderChecks();
     renderFiles();
     streamImages();
+  }
+  /** Bu makinenin raporları: bağlı risk analizi + aynı risk analizine bağlı LVD raporları (00 fabrika testi, 01 …) */
+  const DOT = { pass: 'ok', fail: 'bad', open: 'warn', cond: 'warn' };
+  function raDocNo() {
+    const A = root.RaApp && root.RaApp.state;
+    const M = S.m.meta;
+    return A && A.entry && A.entry.path === M.link && A.doc ? A.doc.p.meta.docNo : M.riskDoc;
+  }
+  function renderSwitch() {
+    const M = S.m.meta;
+    const host = $('lvdDocSwitch');
+    const on = !!M.link;
+    host.classList.toggle('hidden', !on);
+    $('lvdTopBadge').classList.toggle('hidden', on);
+    if (!on) { host.innerHTML = ''; return; }
+    const items = [{ path: S.path, m: S.m, ev: S.ev, cur: true }, ...S.list.filter((x) => x.m && x.path !== S.path && x.m.meta.link === M.link)]
+      .sort((a, b) => String(a.m.meta.docNo).localeCompare(String(b.m.meta.docNo)));
+    const ra = raDocNo();
+    host.innerHTML = `<button type="button" class="ds-tab" data-act="open-ra" title="Risk analizine geç: ${esc(ra || '')} (${esc(M.link)})"><span class="ds-k">Risk analizi</span><span class="ds-no">${esc(ra || 'bağlı')}</span></button>${items.map((x) => {
+      const o = x.ev ? x.ev.overall : '';
+      const t = `LVD test raporu ${x.m.meta.docNo || ''} · Rev ${x.m.meta.rev || '00'} · ${x.m.meta.status === 'final' ? 'yayın' : 'taslak'} · genel sonuç: ${(OVERALL[o] || ['', '—'])[1].toLowerCase()}`;
+      return `<button type="button" class="ds-tab${x.cur ? ' active' : ''}"${x.cur ? ' aria-current="page"' : ` data-lvd-open="${esc(x.path)}"`} title="${esc(t)}${x.cur ? ' (açık)' : ' — açmak için tıklayın'}"><span class="ds-k">LVD testi</span><span class="ds-no">${esc(x.m.meta.docNo || x.path.split('/').pop())}<i class="ds-dot ${DOT[o] || ''}"></i></span></button>`;
+    }).join('')}`;
   }
   function renderBanner() {
     const b = $('lvdBanner');
@@ -566,7 +580,7 @@
       <div class="sum-card"><h3>Ölçümler</h3>${LIB.MEAS.map((k) => `<div class="sum-row"><span>${SHORT[k]}</span><span class="v">${T[k].n ? `${T[k].n} · ${rng(k)}` : '—'}</span></div>`).join('')}
         <div class="sum-row"><span>Gözle kontrol</span><span class="v">${T.visual.ok} U · ${T.visual.nok} UD · ${T.visual.na} UY · ${T.visual.open} boş</span></div>
         <div class="sum-row"><span>Fonksiyon testleri</span><span class="v">${T.func.ok} U · ${T.func.nok} UD · ${T.func.open} boş</span></div></div>
-      ${m.meta.link ? `<div class="sum-card"><h3>Risk analizi</h3><div class="sum-row"><span>${esc(m.meta.riskDoc || '—')}</span><span class="v"><button type="button" class="link" data-act="open-ra">aç</button></span></div></div>` : ''}`;
+      ${m.meta.link ? `<div class="sum-card"><h3>Risk analizi <span>bağlı</span></h3><div class="sum-row"><span><button type="button" class="link" data-act="open-ra" title="Risk analizine geç">${esc(raDocNo() || m.meta.link.split('/').pop())}</button></span><span class="v"><button type="button" class="link" data-act="open-ra">aç →</button></span></div><div class="sum-row"><span class="muted">${esc(m.meta.link)}</span></div></div>` : ''}`;
   }
   function renderChecks() {
     const { ev } = S;
@@ -794,7 +808,9 @@
   function openRA() {
     const link = S.m && S.m.meta.link;
     if (!link || !root.RaApp) return;
+    const A = root.RaApp.state;
     closeAll();
+    if (A.entry && A.entry.path === link && A.doc && !$('app').classList.contains('hidden')) return;
     root.RaApp.open(link);
   }
 
@@ -1358,7 +1374,8 @@
     document.querySelectorAll('[data-lvl]').forEach((b) => b.addEventListener('click', () => { document.querySelectorAll('[data-lvl]').forEach((x) => x.classList.toggle('active', x === b)); $('lvdToc').classList.toggle('hidden', b.dataset.lvl !== 'toc'); $('lvdFiles').classList.toggle('hidden', b.dataset.lvl !== 'files'); }));
     document.querySelectorAll('[data-lvr]').forEach((b) => b.addEventListener('click', () => { document.querySelectorAll('[data-lvr]').forEach((x) => x.classList.toggle('active', x === b)); $('lvdSum').classList.toggle('hidden', b.dataset.lvr !== 'sum'); $('lvdChecks').classList.toggle('hidden', b.dataset.lvr !== 'checks'); }));
     $('lvdToc').addEventListener('click', (e) => { const t = e.target.closest('[data-page]'); if (t) scrollToPage(+t.dataset.page); });
-    $('lvdDoc').addEventListener('click', (e) => { const a = e.target.closest("a[href^='#']"); if (!a) return; e.preventDefault(); const n = $('lvdDoc').querySelector(a.getAttribute('href')); const pg = n && n.closest('.page'); if (pg) scrollToPage(+pg.dataset.page); });
+    $('lvdDocSwitch').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.act === 'open-ra') openRA(); else if (b.dataset.lvdOpen) openReport(b.dataset.lvdOpen); });
+    $('lvdDoc').addEventListener('click', (e) => { if (e.target.closest('[data-open-ra]')) { openRA(); return; } const a = e.target.closest("a[href^='#']"); if (!a) return; e.preventDefault(); const n = $('lvdDoc').querySelector(a.getAttribute('href')); const pg = n && n.closest('.page'); if (pg) scrollToPage(+pg.dataset.page); });
     const acts = (e) => {
       const a = e.target.closest('[data-act]');
       if (!a) return;
@@ -1409,7 +1426,7 @@
     }, 300);
   }
 
-  root.RaLvdApp = { openList, openReport, openStudio: (t) => openStudio(t), close: closeAll, state: S, exportPdf: (langs, save) => exportPdf(langs, save, () => {}), reload, importFromRA, takeFiles: (files) => takeFiles(files), get work() { return W; } };
+  root.RaLvdApp = { openList, openReport, fromRA, openStudio: (t) => openStudio(t), close: closeAll, state: S, exportPdf: (langs, save) => exportPdf(langs, save, () => {}), reload, importFromRA, takeFiles: (files) => takeFiles(files), get work() { return W; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })(typeof self !== 'undefined' ? self : this);

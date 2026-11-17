@@ -15,8 +15,6 @@
 /* Ana ekran sekmesi ve risk analizi çubuğundaki düğme */
 .home-tab.lvd-home-tab { color: #f3c4c4; }
 .home-tab.lvd-home-tab:hover { color: var(--text); }
-.app.no-meta #btnLvdOpen { display: none; }
-#btnLvdOpen { font-weight: 700; letter-spacing: 0.04em; }
 
 /* Liste */
 .lvd-intro { margin: 18px 40px 0; padding: 11px 15px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--dolfin); border-radius: var(--radius); color: #c6cbd5; font-size: 12.5px; line-height: 1.55; flex-shrink: 0; }

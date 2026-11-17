@@ -301,7 +301,7 @@
     if (m.rev) c.push(`<span class="pc-chip">Rev ${esc(m.rev)}</span>`);
     c.push(m.status === 'final' ? '<span class="pc-chip ok">Yayın</span>' : '<span class="pc-chip">Taslak</span>');
     if (m.langs) c.push(`<span class="pc-chip dark">${m.langs.map((l) => l.toUpperCase()).join(' ')}</span>`);
-    if (s.elektrik) c.push('<span class="pc-chip has">LVD</span>');
+    if (s.elektrik) c.push('<span class="pc-chip has">Elektrik</span>');
     if (s.gurultu) c.push('<span class="pc-chip has">Gürültü</span>');
     if (s.termografi) c.push('<span class="pc-chip has">Termal</span>');
     return c.join('');
@@ -338,6 +338,7 @@
           ${e.empty ? '' : `<div class="pc-actions"><span class="pc-new" data-newunit="${esc(e.path)}">+ Yeni makine raporu</span>${e.units.length > 4 ? `<span class="pc-more">+${e.units.length - 4} rapor daha (üstteki kutudan arayın)</span>` : ''}</div>`}</div>`;
       }).join('')}`).join('') || '<div class="home-empty">models klasöründe model yok.</div>';
     }
+    decorateHomeLvd();
   }
   function showHome() {
     stopWatch();
@@ -449,8 +450,9 @@
     }
     return out;
   }
-  async function linkedLvd(entry, files) {
-    if (!root.RaLvd || !entry || entry.kind === 'model') return [];
+  /** Bütün LVD raporlarının özetleri (RaLvd.summary); metin yalnız dosya kimliği değişince yeniden okunur */
+  async function lvdSummaries(files) {
+    if (!root.RaLvd) return [];
     const out = [];
     for (const f of files || await lvdFiles()) {
       let c = lvdCache.get(f.dir);
@@ -458,9 +460,34 @@
         try { const m = root.RaLvd.parse(await store.text(`${f.dir}/lvd.md`), f.dir); c = { sig: f.sig, s: root.RaLvd.summary(m, null, f.dir) }; } catch (e) { c = { sig: f.sig, s: null }; }
         lvdCache.set(f.dir, c);
       }
-      if (c.s && c.s.link === entry.path) out.push(c.s);
+      if (c.s) out.push(c.s);
     }
-    return out.sort((a, b) => String(a.docNo).localeCompare(String(b.docNo)));
+    return out.sort((x, y) => String(x.docNo).localeCompare(String(y.docNo)));
+  }
+  async function linkedLvd(entry, files) {
+    if (!entry || entry.kind === 'model') return [];
+    return (await lvdSummaries(files)).filter((x) => x.link === entry.path);
+  }
+  const LVD_DOT = { pass: 'ok', fail: 'bad', open: 'warn', cond: 'warn' };
+  const LVD_TXT = { pass: 'uygun', fail: 'uygun değil', open: 'açık', cond: 'koşullu' };
+  const lvdTitle = (x) => `LVD test raporu ${x.docNo} · Rev ${x.rev} · ${x.status === 'final' ? 'yayın' : 'taslak'} · genel sonuç: ${LVD_TXT[x.overall] || x.overall}${x.date ? ` · test ${x.date}` : ''}`;
+  /** Ana ekran: risk analizine bağlı LVD raporu kartta ve makine raporu satırında görünür */
+  async function decorateHomeLvd() {
+    let all = [];
+    try { all = await lvdSummaries(); } catch (e) { return; }
+    const by = new Map();
+    for (const x of all) if (x.link) { if (!by.has(x.link)) by.set(x.link, []); by.get(x.link).push(x); }
+    document.querySelectorAll('#homeList [data-open]').forEach((el) => {
+      const hit = by.get(el.dataset.open);
+      if (!hit || el.querySelector('.pc-lvd, .lvd-mini')) return;
+      if (el.classList.contains('pc-unit')) {
+        const last = el.querySelector('span:last-child');
+        if (last) last.insertAdjacentHTML('afterbegin', `<i class="lvd-mini" title="${esc(hit.map(lvdTitle).join(' | '))}">LVD</i>`);
+        return;
+      }
+      const chips = el.querySelector('.pc-chips');
+      if (chips) chips.insertAdjacentHTML('beforeend', hit.map((x) => `<span class="pc-chip has pc-lvd" title="${esc(lvdTitle(x))}"><i class="ds-dot ${LVD_DOT[x.overall] || ''}"></i>${esc(x.docNo)}</span>`).join(''));
+    });
   }
   /** Belgenin dosya imzası: md ve alt klasör dosyalarının kimlikleri (metin okunmaz) */
   async function readSig(entry) {
@@ -535,6 +562,7 @@
     $('docTitle').textContent = t.main;
     $('docState').textContent = t.sub;
     $('docState').className = '';
+    $('raDocSwitch').classList.add('hidden');
     $('pathInfo').textContent = entry.path;
     $('btnMeasure').classList.toggle('hidden', entry.kind !== 'birim');
     $('btnNewUnit').classList.toggle('hidden', entry.kind !== 'model' && entry.kind !== 'birim');
@@ -890,7 +918,8 @@
     }
     const L = root.RA_T[S.lang];
     $('doc').querySelectorAll('.lh-doc').forEach((n) => { n.textContent = `${L.hdrTitle} · ${m.docNo} · Rev. ${m.rev}`; });
-    $('docTitle').textContent = `${m.docNo} · ${m.model}`;
+    $('docTitle').textContent = docTitleOf(m);
+    renderDocSwitch(m);
     $('docState').textContent = `${m.customer} · Rev ${m.rev} · ${m.status === 'final' ? 'yayın' : 'taslak'}${m.type === 'birim' ? ' · makine raporu' : ''}`;
   }
   function revertField(inp, msg) {
@@ -1085,7 +1114,8 @@
     streamImages();
     fillMetaBar();
     const m = d.p.meta;
-    $('docTitle').textContent = `${m.docNo} · ${m.model}`;
+    renderDocSwitch();
+    $('docTitle').textContent = docTitleOf(m);
     $('docState').textContent = `${m.customer} · Rev ${m.rev} · ${m.status === 'final' ? 'yayın' : 'taslak'}${m.type === 'model' ? ' · model şablonu' : m.type === 'birim' ? ' · makine raporu' : ''}`;
     $('pageInfo').textContent = `${r.pages.length} sayfa${S.lang !== 'tr' && r.stats.missing ? ` · ${r.stats.missing} eksik çeviri (TR gösteriliyor)` : ''}`;
     renderToc(r.toc);
@@ -1094,6 +1124,30 @@
     renderChecks();
     const logoSrc = logo((root.RA_LIB.brands[m.brand] || root.RA_LIB.brands.DOLFIN).logo);
     $('tbLogo').src = logoSrc;
+  }
+  /* ─── Bu makinenin raporları: risk analizi ↔ LVD test raporu (üst çubuk sekmeleri) ─── */
+  const switchOn = () => !!(S.entry && S.doc && !S.entry.empty && S.entry.kind !== 'model' && root.RaLvdApp);
+  const docTitleOf = (m) => (switchOn() ? `${m.job || m.docNo} · ${m.model}` : `${m.docNo} · ${m.model}`);
+  function renderDocSwitch(meta) {
+    const host = $('raDocSwitch');
+    const on = switchOn();
+    host.classList.toggle('hidden', !on);
+    if (!on) { host.innerHTML = ''; return; }
+    const m = meta || S.doc.p.meta;
+    const lv = S.doc.ev.lvd || [];
+    host.innerHTML = `<button type="button" class="ds-tab active" aria-current="page" title="Risk değerlendirme raporu ${esc(m.docNo || '')} (açık)"><span class="ds-k">Risk analizi</span><span class="ds-no">${esc(m.docNo || '—')}</span></button>${
+      lv.length
+        ? lv.map((x) => `<button type="button" class="ds-tab" data-lvd-open="${esc(x.path)}" title="${esc(lvdTitle(x))} — açmak için tıklayın"><span class="ds-k">LVD testi</span><span class="ds-no">${esc(x.docNo || x.path.split('/').pop())}<i class="ds-dot ${LVD_DOT[x.overall] || ''}"></i></span></button>`).join('')
+        : '<button type="button" class="ds-tab ds-add" data-lvd-new="1" title="Bu makinenin LVD test raporunu oluştur (EN 60204-1 Bölüm 18): makine bilgileri, elektrik ölçümleri ve fotoğraflar bu risk analizinden kopyalanır; numara LVD-<iş no>-00 olur"><span class="ds-k">LVD testi</span><span class="ds-no">+ Oluştur</span></button>'}`;
+  }
+  /** Sekme, sağ panel ve rapor içindeki numaralar: LVD raporunu açar ya da bu risk analiziyle oluşturur */
+  function lvdAction(e) {
+    const t = e.target.closest('[data-lvd-open], [data-lvd-new], [data-open-lvd]');
+    if (!t || !root.RaLvdApp) return false;
+    const path = t.dataset.lvdOpen || t.dataset.openLvd;
+    if (path) root.RaLvdApp.openReport(path);
+    else root.RaLvdApp.fromRA();
+    return true;
   }
   function renderToc(toc) {
     $('leftToc').innerHTML = `<button type="button" class="toc-item cover" data-page="1"><span class="n">—</span><span>Kapak</span><span class="p">1</span></button>${toc.map((t) => `<button type="button" class="toc-item${t.sub ? ' sub' : ''}" data-page="${t.page}"><span class="n">${t.num}</span><span>${t.title}</span><span class="p">${t.page}</span></button>`).join('')}`;
@@ -1126,6 +1180,11 @@
     const ns = ev.noise;
     const th = ev.thermal;
     const auto = Object.values(ev.auto.measures).reduce((n, a) => n + a.length, 0);
+    const lv = ev.lvd || [];
+    const lvChip = (o) => `<span class="chip ${o === 'pass' ? 'green' : o === 'fail' ? 'red' : 'amber'}">${LVD_TXT[o] || o}</span>`;
+    const lvdCard = switchOn() ? `<div class="sum-card"><h3>LVD test raporu <span>EN 60204-1 §18</span></h3>${lv.length
+      ? lv.map((x) => `<div class="sum-row"><span><button type="button" class="link" data-lvd-open="${esc(x.path)}" title="LVD test raporunu aç">${esc(x.docNo)}</button> <span class="muted">Rev ${esc(x.rev)} · ${x.status === 'final' ? 'yayın' : 'taslak'}${x.date ? ` · test ${esc(x.date)}` : ''}</span></span><span class="v">${lvChip(x.overall)}</span></div>`).join('')
+      : '<div class="sum-row"><span>Bağlı rapor yok</span><span class="v"><button type="button" class="link" data-lvd-new="1">+ oluştur</button></span></div>'}</div>` : '';
     const tpl = S.entry && S.entry.kind === 'birim' ? `<div class="sum-card"><h3>Şablon</h3><div class="sum-row"><span>${esc(((S.entry.model || {}).meta || {}).model || '')}</span><span class="v">${S.entry.frozen ? chip(true, `rev ${esc(p.meta.templateRev || '00')} · donduruldu`) : chip(null, `rev ${esc(((S.entry.model || {}).meta || {}).templateRev || '00')} · canlı`)}</span></div></div>` : '';
     $('rightSum').innerHTML = `${tpl}
       <div class="sum-card"><h3>Riskler <span>${p.hazards.length} tehlike</span></h3>
@@ -1136,6 +1195,7 @@
         <div class="sum-row"><span>Elektrik (EN 60204-1)</span><span class="v">${el.any ? chip(!el.fails, `${el.n} ölçüm${el.fails ? ` · ${el.fails} uygunsuz` : ' · uygun'}`) : chip(null, 'değer yok')}</span></div>
         <div class="sum-row"><span>Gürültü</span><span class="v">${ns.any ? chip(ns.cls !== 'limit' && !ns.invalid, `${ns.opMax.toFixed(1).replace('.', ',')} dB(A)`) : chip(null, 'yok')}</span></div>
         <div class="sum-row"><span>Termal</span><span class="v">${th.any && th.max != null ? chip(th.pass, `${th.max.toFixed(1).replace('.', ',')} °C / ${th.limit} °C`) : chip(null, 'yok')}</span></div></div>
+      ${lvdCard}
       ${auto || ev.auto.actions.length ? `<div class="sum-card"><h3>Kurallarla eklenenler</h3>
         <div class="sum-row"><span>Önlem satırı</span><span class="v">${auto}</span></div>
         <div class="sum-row"><span>Aksiyon</span><span class="v">${ev.auto.actions.length}</span></div>
@@ -1493,7 +1553,7 @@ no: ${o.no}
 musteri: ${o.customer || '[Müşteri]'}
 model: ${o.model}
 marka: DOLFIN
-dokuman: RA-${o.no}-00
+dokuman: RA-${o.no}
 rev: 00
 tarih: ${todayStr()}
 durum: taslak
@@ -1533,7 +1593,7 @@ hazirlayan: Fatih GÜRAL
         try {
           if (await store.exists(`${dir}/rapor.md`)) throw new Error('Bu iş için rapor zaten var');
           for (const sub of ['olcum', 'gurultu', 'termal', 'kurulum', 'cikti']) await store.mkdir(`${dir}/${sub}`);
-          const md = root.RaDoc.serializeUnit({ job: no, customer: cu, docNo: `RA-${no}-00`, rev: '00', reportDate: box.querySelector('#nuDate').value.trim(), status: 'draft', templateRev: (model.meta || {}).templateRev || '00' });
+          const md = root.RaDoc.serializeUnit({ job: no, customer: cu, docNo: `RA-${no}`, rev: '00', reportDate: box.querySelector('#nuDate').value.trim(), status: 'draft', templateRev: (model.meta || {}).templateRev || '00' });
           await store.write(`${dir}/rapor.md`, md);
           close();
           await scan();
@@ -1822,7 +1882,9 @@ hazirlayan: Fatih GÜRAL
     document.querySelectorAll('[data-left]').forEach((b) => b.addEventListener('click', () => { document.querySelectorAll('[data-left]').forEach((x) => x.classList.toggle('active', x === b)); $('leftToc').classList.toggle('hidden', b.dataset.left !== 'toc'); $('leftFiles').classList.toggle('hidden', b.dataset.left !== 'files'); }));
     document.querySelectorAll('[data-right]').forEach((b) => b.addEventListener('click', () => { document.querySelectorAll('[data-right]').forEach((x) => x.classList.toggle('active', x === b)); $('rightSum').classList.toggle('hidden', b.dataset.right !== 'sum'); $('rightChecks').classList.toggle('hidden', b.dataset.right !== 'checks'); }));
     $('leftToc').addEventListener('click', (e) => { const t = e.target.closest('[data-page]'); if (t) scrollToPage(+t.dataset.page); });
-    $('doc').addEventListener('click', (e) => { const a = e.target.closest("a[href^='#']"); if (!a) return; e.preventDefault(); const n = $('doc').querySelector(a.getAttribute('href')); const pg = n && n.closest('.page'); if (pg) scrollToPage(+pg.dataset.page); });
+    $('raDocSwitch').addEventListener('click', lvdAction);
+    $('rightSum').addEventListener('click', lvdAction);
+    $('doc').addEventListener('click', (e) => { if (lvdAction(e)) return; const a = e.target.closest("a[href^='#']"); if (!a) return; e.preventDefault(); const n = $('doc').querySelector(a.getAttribute('href')); const pg = n && n.closest('.page'); if (pg) scrollToPage(+pg.dataset.page); });
     window.addEventListener('resize', () => { if (S.zoom === 'fit' || S.zoom === 'page') applyZoom(); });
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && S.doc && $('studio').classList.contains('hidden')) { e.preventDefault(); openPdfDialog(); }

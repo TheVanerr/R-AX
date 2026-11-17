@@ -282,6 +282,8 @@
     const m = p.meta;
     const placeholder = (v) => !v || /^\[.*\]$/.test(String(v).trim());
     if (placeholder(m.job)) c('error', 'İş / proje numarası yazılmamış (ön bilgi: no)');
+    // Rapor no: RA-<iş no> (iş no = makine seri no); rev ayrı alandır, numaraya eklenmez ve numara revizyonla değişmez
+    else if (m.type !== 'model' && m.docNo && m.docNo !== `RA-${String(m.job).trim()}`) c('warn', `Rapor no ${m.docNo} kurala uymuyor: RA-${String(m.job).trim()} olmalı (rev ayrı alandır, numaraya eklenmez)`);
     if (placeholder(m.customer)) c('error', 'Müşteri yazılmamış (ön bilgi: musteri)');
     if (placeholder(m.model)) c('error', 'Model yazılmamış (ön bilgi: model)');
     if (!m.reportDate) c('warn', 'Rapor tarihi yazılmamış (ön bilgi: tarih)');
@@ -341,10 +343,10 @@
         if (s.fails) c('error', `${{ rpe: 'R_PE', iso: 'Yalıtım', hv: 'Gerilim dayanım' }[k]}: ${s.fails} ölçüm ölçütü sağlamıyor`);
       }
       for (const k of ['rpe', 'iso', 'hv']) for (const r of p.elec[k]) if (r.value && !r.photo) c('info', `Elektrik ${k.toUpperCase()} ${r.tag}: ölçüm fotoğrafı yok`);
-      // LVD test raporu bağlantısı: ortak gövde iş no (= makine seri no), RA-<no>-NN ↔ LVD-<no>-NN
+      // LVD test raporu bağlantısı: ortak gövde iş no (= makine seri no), RA-<no> ↔ LVD-<no>-NN (eski RA-<no>-NN de okunur)
       const LV = ev.lvd;
       const core = String(m.job || '').trim();
-      const raNo = /^RA-(.+)-(\d{2,})$/.exec(String(m.docNo || '').trim());
+      const raNo = /^RA-(.+?)(?:-\d{2,})?$/.exec(String(m.docNo || '').trim());
       if (!LV.length) c('info', "Bağlı LVD test raporu yok (EN 60204-1 §18 ayrıntılı test kaydı) — LVD Testleri'nden bu risk analizine bağlı rapor açılabilir");
       for (const x of LV) {
         const lv = /^LVD-(.+)-(\d{2,})$/.exec(String(x.docNo || '').trim());

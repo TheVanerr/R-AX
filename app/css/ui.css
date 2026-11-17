@@ -368,3 +368,54 @@ textarea.field-input { resize: vertical; min-height: 54px; }
 .th-card .th-v b { color: #ff8585; }
 .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
 .hint b { color: var(--text); }
+
+/* ── Kurulu uygulama (PWA): pencere denetimleri katmanı ──
+   manifest display_override: window-controls-overlay. Başlık çubuğu alanı uygulamanındır; pencere düğmeleri (…, _, □, ×) Windows'ta sağ üstte,
+   macOS'ta sol üstte içeriğin üstüne biner. Üst çubuklar o kadar yer bırakır ve boş yerlerinden pencere sürüklenir.
+   Tarayıcı sekmesinde ya da standart başlık çubuğunda titlebar-area-* tanımsızdır: boşluk 0 olur. */
+:root {
+  --wco-left: env(titlebar-area-x, 0px);
+  --wco-right: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
+}
+.topbar { padding-left: calc(10px + var(--wco-left)); padding-right: calc(12px + var(--wco-right)); }
+.home-bar { padding-left: calc(40px + var(--wco-left)); padding-right: calc(40px + var(--wco-right)); }
+.cs-bar { padding-left: calc(18px + var(--wco-left)); padding-right: calc(18px + var(--wco-right)); }
+@media (display-mode: window-controls-overlay) {
+  .topbar, .home-bar, .cs-bar { -webkit-app-region: drag; app-region: drag; }
+  .topbar :is(button, input, select, textarea, a, label, [role='button'], [tabindex], .combo, .lang-seg, .doc-switch),
+  .home-bar :is(button, input, select, textarea, a, label, [role='button'], [tabindex]),
+  .cs-bar :is(button, input, select, textarea, a, label, [role='button'], [tabindex]) { -webkit-app-region: no-drag; app-region: no-drag; }
+  .gate::before { content: ''; position: fixed; top: 0; left: env(titlebar-area-x, 0px); width: env(titlebar-area-width, 100%); height: env(titlebar-area-height, 32px); -webkit-app-region: drag; app-region: drag; }
+}
+
+/* ── Bu makinenin raporları: risk analizi ↔ LVD test raporu (üst çubukta doküman sekmeleri) ── */
+.doc-switch { display: inline-flex; align-items: stretch; height: 38px; margin: 0 4px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); overflow: hidden; flex-shrink: 0; }
+.doc-switch.hidden { display: none; }
+.ds-tab { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 13px; background: transparent; border: 0; border-right: 1px solid var(--line); color: var(--muted); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; }
+.ds-tab:last-child { border-right: 0; }
+.ds-tab:hover { background: var(--panel-3); color: var(--text); }
+.ds-tab:focus-visible { outline: 2px solid var(--dolfin); outline-offset: -2px; }
+.ds-tab.active { background: var(--panel); color: var(--text); cursor: default; box-shadow: inset 0 -2px 0 var(--dolfin); }
+.ds-k { font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.1; }
+.ds-tab.active .ds-k { color: #f3c4c4; }
+.ds-no { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.ds-add .ds-no { color: #8ab4ff; font-weight: 500; }
+.ds-add:hover .ds-no { color: #b3ceff; }
+.ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; flex-shrink: 0; }
+.ds-dot.ok { background: #3fb56f; }
+.ds-dot.warn { background: #e0a030; }
+.ds-dot.bad { background: #ef4444; }
+@media (max-width: 1440px) {
+  .topbar .combo { width: 250px; }
+  .doc-switch { height: 32px; }
+  .ds-k { display: none; }
+  .ds-tab { padding: 0 10px; }
+}
+/* Rapor içindeki doküman numaraları: görüntüleyicide tıklanınca o rapor açılır (PDF'te düz metin) */
+#doc .doc-ref, #lvdDoc .doc-ref { cursor: pointer; text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+#doc .doc-ref:hover, #lvdDoc .doc-ref:hover { color: var(--brand); text-decoration-style: solid; }
+/* Ana ekran: bağlı LVD raporu */
+.pc-chip.pc-lvd { display: inline-flex; align-items: center; gap: 5px; }
+.pc-chip.pc-lvd .ds-dot { width: 6px; height: 6px; }
+.pc-unit .lvd-mini { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #f3c4c4; border: 1px solid rgba(243, 196, 196, 0.35); border-radius: 3px; padding: 0 4px; margin-right: 6px; }
+.sum-card .muted { color: var(--muted); font-size: 11px; font-weight: 400; }

@@ -83,6 +83,8 @@
     const X = makeX(lang, stats);
     const Xn = (o) => X(o, { ph: false });
     const M = m.meta;
+    // Bağlı risk analizinin numarası: görüntüleyicide tıklanınca risk analizi açılır (data-open-ra); PDF'te düz metin
+    const raRef = `<span class="doc-ref" data-open-ra="1">${esc(M.riskDoc || '')}</span>`;
     const Lm = m.limits;
     const dec = T.dec;
     const fmt = (v, d) => U.fmtDec(v, d, dec);
@@ -201,7 +203,7 @@
         ${h2('1', T.s1)}
         <p>${T.purpose(v)}</p>
         <p>${T.purpose2}</p>
-        ${M.riskDoc ? `<div class="note">${T.linked(esc(M.riskDoc))}</div>` : ''}
+        ${M.riskDoc ? `<div class="note">${T.linked(raRef)}</div>` : ''}
         <div class="gap"></div>
         ${h2('2', T.s2)}
         <table class="t"><thead><tr><th style="width:48mm">${T.stdCols[0]}</th><th>${T.stdCols[1]}</th></tr></thead><tbody>${T.standards.map(([r, t]) => `<tr><td><b>${esc(r)}</b></td><td>${esc(t)}</td></tr>`).join('')}</tbody></table>
@@ -368,7 +370,7 @@
         const clause = f.clause || (lib ? lib.clause : '') || f.ref;
         return `<tr><td class="c nowrap"><b>${esc(f.id)}</b>${clause ? `<br><span class="muted small">${esc(clause)}</span>` : ''}</td><td>${test}</td><td>${exp}</td><td class="c">${resPill(f.result)}</td><td class="num-cell">${esc(f.date) || '—'}</td><td>${Xn(f.note) || '—'}</td></tr>`;
       }).join('') || `<tr><td colspan="6" class="c">${ph(T.fill)}</td></tr>`;
-      const valNote = M.riskDoc ? `<div class="note small">${lang === 'tr' ? `Güvenlik fonksiyonlarının validasyon testleri (EN ISO 13849-2) <b>${esc(M.riskDoc)}</b> numaralı risk değerlendirme raporunda yer alır.` : lang === 'de' ? `Die Validierungsprüfungen der Sicherheitsfunktionen (EN ISO 13849-2) sind in der Risikobeurteilung <b>${esc(M.riskDoc)}</b> enthalten.` : `The validation tests of the safety functions (EN ISO 13849-2) are contained in risk assessment report <b>${esc(M.riskDoc)}</b>.`}</div>` : '';
+      const valNote = M.riskDoc ? `<div class="note small">${lang === 'tr' ? `Güvenlik fonksiyonlarının validasyon testleri (EN ISO 13849-2) <b>${raRef}</b> numaralı risk değerlendirme raporunda yer alır.` : lang === 'de' ? `Die Validierungsprüfungen der Sicherheitsfunktionen (EN ISO 13849-2) sind in der Risikobeurteilung <b>${raRef}</b> enthalten.` : `The validation tests of the safety functions (EN ISO 13849-2) are contained in risk assessment report <b>${raRef}</b>.`}</div>` : '';
       sections.push({ newPage: true, html: `
         ${h2('8', T.s8, T.s8ref)}
         <p>${T.p8}</p>

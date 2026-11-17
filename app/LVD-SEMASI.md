@@ -40,7 +40,7 @@ hazirlayan unvan: Kalite Kontrol Sorumlusu | Quality Control Officer | Qualität
 kontrol: …  ·  kontrol unvan: …  ·  onay: …  ·  onay unvan: …
 hazirlayan logo: atlascert
 risk analizi: projects/0326066-KSYSTE-KBN 1B 1500     # bağlı risk analizi (yalnız okunur)
-risk analizi no: RA-0326066-01                       # raporda atıf; rev yazılmaz (güncel revizyon geçerlidir)
+risk analizi no: RA-0326066                          # raporda atıf; rev yazılmaz (güncel revizyon geçerlidir)
 hazirlayan imza: imza/prepared.png                   # isteğe bağlı imza görselleri (onay tablosunda); kontrol imza, onay imza
 ---
 ```

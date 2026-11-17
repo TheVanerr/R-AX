@@ -65,7 +65,8 @@
     const area = Xn(m.area).replace(/<[^>]+>/g, '');
     const pill = (ok, txt) => `<span class="pill ${ok === true ? 'ok' : ok === false ? 'bad' : 'pend'}">${txt}</span>`;
     // Bağlı LVD test raporu (ev.lvd: RaLvd.summary özetleri); durum hapı
-    const lvdNos = (ev.lvd || []).map((x) => esc(x.docNo)).filter(Boolean).join(', ');
+    // Görüntüleyicide numaraya tıklanınca LVD raporu açılır (data-open-lvd); PDF'te düz metin
+    const lvdNos = (ev.lvd || []).filter((x) => x.docNo).map((x) => `<span class="doc-ref" data-open-lvd="${esc(x.path)}">${esc(x.docNo)}</span>`).join(', ');
     const lvdPill = (st) => pill(st === 'pass' ? true : st === 'fail' ? false : null, (L.lvdState || {})[st] || st || '—');
     const lvdTest = (k) => { const x = (ev.lvd || [])[(ev.lvd || []).length - 1]; return x && x.tests[k] ? x.tests[k] : null; };
     const nop = ev.nop;
@@ -86,7 +87,7 @@
       const revRows = p.revisions.map((r) => `<tr><td class="c">${esc(r.rev)}</td><td>${esc(r.date)}</td><td>${X(r.desc)}</td><td>${r.by ? esc(r.by) : ph('[…]')}</td><td>${r.approvedBy ? esc(r.approvedBy) : ph('[…]')}</td></tr>`).join('')
         + '<tr><td class="c">&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
       const relDocs = (ev.lvd || []).length ? `${h3(L.relDocs)}
-        <table class="t split"><thead><tr><th style="width:34mm">${L.relCols[0]}</th><th>${L.relCols[1]}</th><th style="width:22mm">${L.relCols[2]}</th><th class="c" style="width:26mm">${L.relCols[3]}</th></tr></thead><tbody>${ev.lvd.map((x) => `<tr><td><b>${esc(x.docNo)}</b></td><td>${L.lvdDoc}</td><td>${esc(x.date || '—')}</td><td class="c">${lvdPill(x.overall)}</td></tr>`).join('')}</tbody></table>
+        <table class="t split"><thead><tr><th style="width:34mm">${L.relCols[0]}</th><th>${L.relCols[1]}</th><th style="width:22mm">${L.relCols[2]}</th><th class="c" style="width:26mm">${L.relCols[3]}</th></tr></thead><tbody>${ev.lvd.map((x) => `<tr><td><b class="doc-ref" data-open-lvd="${esc(x.path)}">${esc(x.docNo)}</b></td><td>${L.lvdDoc}</td><td>${esc(x.date || '—')}</td><td class="c">${lvdPill(x.overall)}</td></tr>`).join('')}</tbody></table>
         <div class="note small">${L.relNote}</div>` : '';
       const distRows = p.distribution.map((d, i) => `<tr><td class="c">${i + 1}</td><td>${X(d.to)}</td><td>${X(d.format)}</td></tr>`).join('');
       sections.push({ newPage: true, html: `
