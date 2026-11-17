@@ -27,6 +27,21 @@ function source(absDir) {
   return { dir: rel, files, list };
 }
 
+/** Bu belgeye bağlı LVD test raporlarının özetleri (lvd/<klasör>/lvd.md, "risk analizi: <yol>") */
+export function linkedLvd(rel) {
+  const dir = path.join(ROOT, 'lvd');
+  if (!fs.existsSync(dir)) return [];
+  const Lvd = require('../js/lvd.js');
+  const out = [];
+  for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+    const f = path.join(dir, d.name, 'lvd.md');
+    if (!d.isDirectory() || d.name.startsWith('_') || !fs.existsSync(f)) continue;
+    const m = Lvd.parse(fs.readFileSync(f, 'utf8'), `lvd/${d.name}`);
+    if (m.meta.link === rel) out.push(Lvd.summary(m, null, `lvd/${d.name}`));
+  }
+  return out.sort((a, b) => String(a.docNo).localeCompare(String(b.docNo)));
+}
+
 /** Belgeyi yükler: { p (kural uygulanmış rapor modeli), raw (md modeli), ev (değerlendirme), sources } */
 export function loadDoc(dirArg) {
   const abs = path.resolve(dirArg);
@@ -54,7 +69,7 @@ export function loadDoc(dirArg) {
     }
   }
   const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
-  const ev = RaRules.evaluate(raw, { exists });
+  const ev = RaRules.evaluate(raw, { exists, lvd: peek.meta.type === 'model' ? [] : linkedLvd(toRel(abs)) });
   const p = RaRules.apply(raw, ev);
   return { p, raw, ev, sources };
 }

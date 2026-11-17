@@ -30,8 +30,8 @@ yil: 2026
 marka: DOLFIN                       # antet ve kapak: DOLFIN | ENVA | VICO | KSYSTEM
 uretici: CNK Elektronik Makine San. A.Ş.
 marka adi: Dolfin®
-dokuman: LVD-0326066-01
-rev: 00
+dokuman: LVD-0326066-00              # LVD-<makine seri no>-<test sırası>; 00 = fabrika testi, sonraki test 01, 02 … (yeni rapor)
+rev: 00                             # doküman düzeltmesi: numara aynı kalır, rev artar (+ # Revizyonlar satırı)
 tarih: 16.10.2026                   # rapor tarihi
 durum: taslak                       # taslak | yayın
 diller: tr, en, de
@@ -40,7 +40,7 @@ hazirlayan unvan: Kalite Kontrol Sorumlusu | Quality Control Officer | Qualität
 kontrol: …  ·  kontrol unvan: …  ·  onay: …  ·  onay unvan: …
 hazirlayan logo: atlascert
 risk analizi: projects/0326066-KSYSTE-KBN 1B 1500     # bağlı risk analizi (yalnız okunur)
-risk analizi no: RA-0326066-01 Rev. 00               # raporda atıf
+risk analizi no: RA-0326066-01                       # raporda atıf; rev yazılmaz (güncel revizyon geçerlidir)
 hazirlayan imza: imza/prepared.png                   # isteğe bağlı imza görselleri (onay tablosunda); kontrol imza, onay imza
 ---
 ```
@@ -164,7 +164,7 @@ Güvenlik fonksiyonlarının validasyonu (EN ISO 13849-2) risk analizinde kalır
 Tür: `kapak` · `etiket` · `pano` · `kurulum` · `genel`. Ek B sırası: kurulum, kapak, etiket, pano, genel, gözle kontrol kanıtları.
 
 ### `# Sonuç` · `# Revizyonlar`
-Sonuç paragrafı yazılmazsa kurallara göre hazır cümle kullanılır. Revizyon tablosu risk analiziyle aynıdır (`| Rev | Tarih | Açıklama | Hazırlayan | Onaylayan |`); güncel revizyonun satırı ön bilgiden gelir. Tanınmayan bölümler (`# Notlar` vb.) dosyada olduğu gibi korunur, rapora girmez.
+Sonuç paragrafı yazılmazsa kurallara göre hazır cümle kullanılır. Revizyon tablosu risk analiziyle aynıdır (`| Rev | Tarih | Açıklama | Hazırlayan | Onaylayan |`); güncel revizyonun satırı ön bilgiden gelir. Revizyon yalnız doküman düzeltmesidir (test tekrarlanmamıştır; öntanımlı açıklama "Doküman düzeltmesi — test tekrarlanmamıştır | Document correction — test not repeated | Dokumentkorrektur — Prüfung nicht wiederholt"). Test yeniden yapıldıysa rev artırılmaz, bir sonraki test sırasıyla yeni LVD raporu açılır (`LVD-<seri no>-01`, klasör `<iş>-<MÜŞTERİ>-<MODEL>-01`). Rapor no, rev, tarih, müşteri, kişiler / unvanlar ve durum uygulamada görüntüleyicinin üstündeki bilgi çubuğundan değiştirilir; aynı rapor no iki LVD raporunda kullanılamaz (kontrol: hata). Tanınmayan bölümler (`# Notlar` vb.) dosyada olduğu gibi korunur, rapora girmez.
 
 ## Fotoğraf ad kuralı
 

@@ -693,7 +693,7 @@
     m.manufacturer = m.manufacturer || 'CNK Elektronik Makine San. A.Ş.';
     m.brandName = m.brandName || (m.brand === 'DOLFIN' ? 'Dolfin®' : '');
     m.brandLine = m.brandLine || (m.brand === 'DOLFIN' ? 'Dolfin® Industrial Parts Washing Machines' : '');
-    m.docNo = m.docNo || `RA-${m.job}-01`;
+    m.docNo = m.docNo || `RA-${m.job}-00`;
     m.rev = m.rev || '00';
     m.reportDate = m.reportDate || '';
     m.status = m.status || 'draft';

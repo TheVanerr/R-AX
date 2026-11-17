@@ -434,6 +434,34 @@
     }
     return sources;
   }
+  /* Bağlı LVD test raporları: lvd/<klasör>/lvd.md içinde "risk analizi: <bu belgenin yolu>". Bağlantı yalnız LVD tarafında yazılır;
+     risk analizi md'sine alan eklenmez. Metinler dosya kimliğine göre önbellekte tutulur. */
+  const lvdCache = new Map();
+  async function lvdFiles() {
+    let dirs = [];
+    try { dirs = (await store.list('lvd')).filter((e) => e.kind === 'dir' && !e.name.startsWith('_')); } catch (e) { return []; }
+    const out = [];
+    for (const d of dirs) {
+      try {
+        const f = (await store.list(`lvd/${d.name}`)).find((e) => e.kind === 'file' && e.name === 'lvd.md');
+        if (f) out.push({ dir: `lvd/${d.name}`, sig: f.sig });
+      } catch (e) { /* okunamayan klasör atlanır */ }
+    }
+    return out;
+  }
+  async function linkedLvd(entry, files) {
+    if (!root.RaLvd || !entry || entry.kind === 'model') return [];
+    const out = [];
+    for (const f of files || await lvdFiles()) {
+      let c = lvdCache.get(f.dir);
+      if (!c || c.sig !== f.sig) {
+        try { const m = root.RaLvd.parse(await store.text(`${f.dir}/lvd.md`), f.dir); c = { sig: f.sig, s: root.RaLvd.summary(m, null, f.dir) }; } catch (e) { c = { sig: f.sig, s: null }; }
+        lvdCache.set(f.dir, c);
+      }
+      if (c.s && c.s.link === entry.path) out.push(c.s);
+    }
+    return out.sort((a, b) => String(a.docNo).localeCompare(String(b.docNo)));
+  }
   /** Belgenin dosya imzası: md ve alt klasör dosyalarının kimlikleri (metin okunmaz) */
   async function readSig(entry) {
     const parts = [];
@@ -442,6 +470,7 @@
       const walked = await store.walk(dir, skip);
       parts.push(`${md.map((f) => `${f.name}:${f.sig}`).join('|')}#${walked.sig}`);
     }
+    if (entry.kind !== 'model') parts.push(`lvd:${(await lvdFiles()).map((f) => `${f.dir}:${f.sig}`).join('|')}`);
     return parts.join('||');
   }
   async function buildDoc(entry) {
@@ -462,9 +491,12 @@
       ...sized.map((pth) => loadImage(pth, fileSig[pth], true).catch(() => null)),
       raw.meta.coverPhoto && known.has(raw.meta.coverPhoto) ? loadImage(raw.meta.coverPhoto, fileSig[raw.meta.coverPhoto]).catch(() => null) : null
     ]);
-    const ev = root.RaRules.evaluate(raw, { exists: (f) => known.has(f) });
+    const lvdF = entry.kind === 'model' ? [] : await lvdFiles();
+    const lvd = await linkedLvd(entry, lvdF).catch(() => []);
+    const ev = root.RaRules.evaluate(raw, { exists: (f) => known.has(f), lvd });
     const p = root.RaRules.apply(raw, ev);
-    return { raw, p, ev, sources, imagePaths: [...paths].filter((x) => known.has(x)), sig: sources.map((s) => s.sig).join('||') };
+    const sig = [...sources.map((s) => s.sig), ...(entry.kind !== 'model' ? [`lvd:${lvdF.map((f) => `${f.dir}:${f.sig}`).join('|')}`] : [])].join('||');
+    return { raw, p, ev, sources, imagePaths: [...paths].filter((x) => known.has(x)), sig };
   }
   const ctx = {
     img: (path) => {
@@ -1461,7 +1493,7 @@ no: ${o.no}
 musteri: ${o.customer || '[Müşteri]'}
 model: ${o.model}
 marka: DOLFIN
-dokuman: RA-${o.no}-01
+dokuman: RA-${o.no}-00
 rev: 00
 tarih: ${todayStr()}
 durum: taslak
@@ -1501,7 +1533,7 @@ hazirlayan: Fatih GÜRAL
         try {
           if (await store.exists(`${dir}/rapor.md`)) throw new Error('Bu iş için rapor zaten var');
           for (const sub of ['olcum', 'gurultu', 'termal', 'kurulum', 'cikti']) await store.mkdir(`${dir}/${sub}`);
-          const md = root.RaDoc.serializeUnit({ job: no, customer: cu, docNo: `RA-${no}-01`, rev: '00', reportDate: box.querySelector('#nuDate').value.trim(), status: 'draft', templateRev: (model.meta || {}).templateRev || '00' });
+          const md = root.RaDoc.serializeUnit({ job: no, customer: cu, docNo: `RA-${no}-00`, rev: '00', reportDate: box.querySelector('#nuDate').value.trim(), status: 'draft', templateRev: (model.meta || {}).templateRev || '00' });
           await store.write(`${dir}/rapor.md`, md);
           close();
           await scan();

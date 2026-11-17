@@ -64,6 +64,10 @@
     const photoOf = (file) => p.photos.find((x) => x.file === file) || (file ? { file, caption: { tr: '' } } : null);
     const area = Xn(m.area).replace(/<[^>]+>/g, '');
     const pill = (ok, txt) => `<span class="pill ${ok === true ? 'ok' : ok === false ? 'bad' : 'pend'}">${txt}</span>`;
+    // Bağlı LVD test raporu (ev.lvd: RaLvd.summary özetleri); durum hapı
+    const lvdNos = (ev.lvd || []).map((x) => esc(x.docNo)).filter(Boolean).join(', ');
+    const lvdPill = (st) => pill(st === 'pass' ? true : st === 'fail' ? false : null, (L.lvdState || {})[st] || st || '—');
+    const lvdTest = (k) => { const x = (ev.lvd || [])[(ev.lvd || []).length - 1]; return x && x.tests[k] ? x.tests[k] : null; };
     const nop = ev.nop;
     const prof = p.limits.profile;
     const evals = ev.sf;
@@ -81,10 +85,14 @@
     {
       const revRows = p.revisions.map((r) => `<tr><td class="c">${esc(r.rev)}</td><td>${esc(r.date)}</td><td>${X(r.desc)}</td><td>${r.by ? esc(r.by) : ph('[…]')}</td><td>${r.approvedBy ? esc(r.approvedBy) : ph('[…]')}</td></tr>`).join('')
         + '<tr><td class="c">&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
+      const relDocs = (ev.lvd || []).length ? `${h3(L.relDocs)}
+        <table class="t split"><thead><tr><th style="width:34mm">${L.relCols[0]}</th><th>${L.relCols[1]}</th><th style="width:22mm">${L.relCols[2]}</th><th class="c" style="width:26mm">${L.relCols[3]}</th></tr></thead><tbody>${ev.lvd.map((x) => `<tr><td><b>${esc(x.docNo)}</b></td><td>${L.lvdDoc}</td><td>${esc(x.date || '—')}</td><td class="c">${lvdPill(x.overall)}</td></tr>`).join('')}</tbody></table>
+        <div class="note small">${L.relNote}</div>` : '';
       const distRows = p.distribution.map((d, i) => `<tr><td class="c">${i + 1}</td><td>${X(d.to)}</td><td>${X(d.format)}</td></tr>`).join('');
       sections.push({ newPage: true, html: `
         ${h3(L.revHist)}
         <table class="t split"><thead><tr><th class="c" style="width:12mm">${L.revCols[0]}</th><th style="width:22mm">${L.revCols[1]}</th><th>${L.revCols[2]}</th><th style="width:34mm">${L.revCols[3]}</th><th style="width:34mm">${L.revCols[4]}</th></tr></thead><tbody>${revRows}</tbody></table>
+        ${relDocs}
         ${h3(L.dist)}
         <table class="t split"><thead><tr><th style="width:12mm" class="c">${L.distCols[0]}</th><th>${L.distCols[1]}</th><th style="width:44mm">${L.distCols[2]}</th></tr></thead><tbody>${distRows || emptyRow(3, NO_ROWS[lang])}</tbody></table>
         <div class="note">${L.readingNote(L.tags)}</div>
@@ -351,12 +359,13 @@
       const fnDone = p.validation.some((v) => v.result);
       sections.push({ newPage: true, html: `
         ${h2('12', L.s12, L.s12ref)}
+        ${lvdNos ? `<div class="note">${L.lvdRef(lvdNos)}</div>` : ''}
         ${kv([[L.elecKV[0], `${E.date ? esc(E.date) : ph(L.fill)}${E.time ? `, ${esc(E.time)}` : ''}${Xn(E.location) ? ` · ${X(E.location)}` : ''}`], [L.elecKV[1], E.serial || E.calib ? L.instrument(rich(E.instrument), rich(E.serial || '—'), rich(E.calib || '—')) : (E.instrument ? rich(E.instrument) : ph(L.fill))], [L.elecKV[2], X(E.connection)], [L.elecKV[3], E.testedBy ? rich(E.testedBy) : ph(L.fill)]])}
         ${h3(L.h121)}
         <table class="t"><thead><tr><th>${L.elecCols[0]}</th><th style="width:22mm">${L.elecCols[1]}</th><th>${L.elecCols[2]}</th><th style="width:26mm">${L.elecCols[3]}</th><th class="c" style="width:11mm">${L.elecCols[4]}</th><th style="width:28mm">${L.elecCols[5]}</th><th class="c" style="width:19mm">${L.elecCols[6]}</th></tr></thead>
           <tbody>${sumRow('rpe')}${sumRow('iso')}${sumRow('hv')}
-          <tr><td>${L.tests.res}</td><td>${L.clause.res}</td><td colspan="4" class="muted">${L.resText}</td><td class="c">${pill(null, L.open)}</td></tr>
-          <tr><td>${L.tests.fn}</td><td>${L.clause.fn}</td><td colspan="4" class="muted">${fnDone ? L.fnDone : L.fnText}</td><td class="c">${p.validation.length && p.validation.every((v) => v.result === 'ok') ? pill(true, L.pass) : fnDone ? pill(null, L.seeS11) : pill(null, L.open)}</td></tr></tbody></table>
+          <tr><td>${L.tests.res}</td><td>${L.clause.res}</td><td colspan="4" class="muted">${lvdTest('res') ? `${L.lvdState[lvdTest('res')] || ''} — ${L.lvdSee(lvdNos)}` : L.resText}</td><td class="c">${lvdTest('res') ? lvdPill(lvdTest('res')) : pill(null, L.open)}</td></tr>
+          <tr><td>${L.tests.fn}</td><td>${L.clause.fn}</td><td colspan="4" class="muted">${fnDone ? L.fnDone : L.fnText}${['pass', 'fail'].includes(lvdTest('func')) ? ` · ${L.lvdSee(lvdNos)} (${L.lvdState[lvdTest('func')]})` : ''}</td><td class="c">${p.validation.length && p.validation.every((v) => v.result === 'ok') ? pill(true, L.pass) : fnDone ? pill(null, L.seeS11) : pill(null, L.open)}</td></tr></tbody></table>
         ${Xn(E.method) ? `<div class="note small"><b>${L.method}</b> ${X(E.method)}</div>` : ''}
         <div class="note small">${L.elecNote}</div>
         ${detail('rpe', L.h122, 'I<sub>test</sub>')}
@@ -376,7 +385,7 @@
       const rows = [
         `<tr><td>${L.conclHaz(p.hazards.length)}</td><td>${p.hazards.length ? L.sumText(a, b) : ph(NO_HAZ[lang])}</td><td class="c">${hzState === 'cond' ? pill(null, L.conditional) : hzState == null ? pill(null, L.open) : pill(hzState, hzState ? L.pass : L.fail)}</td></tr>`,
         ...p.sfs.map((sf, i) => { const e = evals[i]; return `<tr><td>${sf.id} ${X(sf.name)}</td><td>${L.conclSF(e.plr || '—', e.pl || '—')}</td><td class="c">${e.pl && e.plr ? pill(e.ok, `${e.pl} ${e.ok ? '≥' : '<'} ${e.plr}`) : '—'}</td></tr>`; }),
-        `<tr><td>${L.conclElec}</td><td>${es.n ? (es.fails ? L.elecNok(es.n, es.fails) : L.elecOk(es.n)) : L.elecNone}</td><td class="c">${es.n ? pill(!es.fails, es.fails ? L.fail : L.pass) : pill(null, L.open)}</td></tr>`,
+        `<tr><td>${L.conclElec}</td><td>${es.n ? (es.fails ? L.elecNok(es.n, es.fails) : L.elecOk(es.n)) : L.elecNone}${lvdNos ? ` · ${L.lvdSee(lvdNos)}` : ''}</td><td class="c">${es.n ? pill(!es.fails, es.fails ? L.fail : L.pass) : pill(null, L.open)}</td></tr>`,
         ns.any ? `<tr><td>${L.ns.conclRow(ev.annex.noise)}</td><td>${L.ns.conclText(fmt(ns.opMax, 1), ns.n, L.ns.exp[ns.cls])}</td><td class="c">${pill(ns.cls !== 'limit' && !ns.invalid, ns.cls !== 'limit' && !ns.invalid ? L.pass : L.fail)}</td></tr>` : '',
         ev.thermal.any ? `<tr><td>${L.th.conclRow.replace(/\bD\)/, `${ev.annex.thermal})`)}</td><td>${ev.thermal.top ? L.th.conclText(fmt(ev.thermal.max, 1), `D-${ev.thermal.top.i + 1}`, fmt(thLim, 0), Xn(p.thermal.limitText)) : '—'}</td><td class="c">${ev.thermal.max != null ? pill(ev.thermal.pass, ev.thermal.pass ? L.pass : L.fail) : pill(null, L.open)}</td></tr>` : ''
       ].join('');

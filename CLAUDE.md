@@ -70,7 +70,9 @@ Elektriksel güvenlik test raporu; EN 60204-1:2018 Bölüm 18 (§18.1 a–h: gö
 3. Gözle kontrol (G-01 … G-25) ve fonksiyon testlerini (F-xx) **kanıtsız U yapma**: fotoğrafta görülen ya da kullanıcının söylediği kadarını işaretle, gerisini boş bırakıp sor. Yapılmayan test için `- durum:` (kurulum yerinde / uygulanamaz / yapılmadı) yaz.
 4. Test cihazı seri no ve kalibrasyon geçerliliği eksikse sor (geçerlilik test tarihinden önce bitmişse hata).
 5. Üç dil: `diller: tr, en, de` ise not, açıklama, nokta metinleri TR | EN | DE.
-6. Kontrol: `node app/araclar/lvd-kontrol.mjs "lvd/<klasör>"` (hata 0 olmalı); özetle: genel sonuç, a–h durumları, açık noktalar.
+6. Rapor no `LVD-<makine seri no>-<test sırası>`: `00` fabrika testi; aynı makine yeniden test edilirse yeni LVD raporu `-01`, `-02` … (klasör adına da eklenir). Dokümandaki düzeltmede numara değişmez, `rev` artar ve `# Revizyonlar`'a "Doküman düzeltmesi — test tekrarlanmamıştır" satırı eklenir. Aynı numara iki raporda olamaz. Kullanıcı rapor no, rev, tarih, müşteri, kişileri ve durumu görüntüleyicinin üst çubuğundan değiştirir; düzenlemeden önce çek.
+   Risk analiziyle bağlantı: ortak gövde iş no (= makine seri no), `RA-<no>-00` ↔ `LVD-<no>-00` (yeni risk analizleri de `-00` ile başlar; yayınlanmış eski numaralar değişmez). Bağlantıyı yalnız `lvd.md`'deki `risk analizi:` satırı kurar; risk analizi raporu bağlı LVD'yi kendisi bulur ve İlgili Dokümanlar, Bölüm 12, Bölüm 13'te numarasıyla atıf yapar. `risk analizi no:` rev'siz yazılır (ör. `RA-0326066-01`).
+7. Kontrol: `node app/araclar/lvd-kontrol.mjs "lvd/<klasör>"` (hata 0 olmalı); özetle: genel sonuç, a–h durumları, açık noktalar.
 
 ## Kusursuz analiz için kontrol listesi
 

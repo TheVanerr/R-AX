@@ -124,22 +124,24 @@
   }
 
   /* ─── 4. Otomatik önlemler ───────────────────────────────── */
+  // Bölüm 12 atfı; bağlı LVD test raporu varsa numarası da yazılır (ör. "Bölüm 12; LVD-0326066-00")
+  const sec12 = (e, lang) => `${{ tr: 'Bölüm 12', en: 'Section 12', de: 'Abschnitt 12' }[lang]}${e.lvd ? `; ${e.lvd}` : ''}`;
   const RT = {
     elecOk: (e, p, lang) => {
       const L = p.elec.limits;
       const T = {
-        tr: `EN 60204-1 Bölüm 18 testleri ${p.elec.date || '[tarih]'} tarihinde yapılmıştır: koruma iletkeni sürekliliği ${e.rpe.n} noktada ${elecRange(e.rpe, 'Ω', lang)} (ölçüt ≤ ${f(L.rpeMax, 2, lang)} Ω), yalıtım direnci ${e.iso.n} ölçümde ${elecRange(e.iso, 'MΩ', lang)} (ölçüt ≥ ${f(L.isoMin, 2, lang)} MΩ), gerilim dayanımında ${e.hv.n} ölçümde delinme olmamış, kaçak akım ${elecRange(e.hv, 'mA', lang)} (ölçüt ≤ ${f(L.hvMax, 2, lang)} mA) — uygun (Bölüm 12)`,
-        en: `The EN 60204-1 Section 18 tests were carried out on ${p.elec.date || '[date]'}: protective bonding continuity ${elecRange(e.rpe, 'Ω', lang)} at ${e.rpe.n} points (criterion ≤ ${f(L.rpeMax, 2, lang)} Ω), insulation resistance ${elecRange(e.iso, 'MΩ', lang)} in ${e.iso.n} measurements (criterion ≥ ${f(L.isoMin, 2, lang)} MΩ), no breakdown in ${e.hv.n} voltage tests, leakage current ${elecRange(e.hv, 'mA', lang)} (criterion ≤ ${f(L.hvMax, 2, lang)} mA) — passed (Section 12)`,
-        de: `Die Prüfungen nach EN 60204-1 Abschnitt 18 wurden am ${p.elec.date || '[Datum]'} durchgeführt: Schutzleiterdurchgängigkeit ${elecRange(e.rpe, 'Ω', lang)} an ${e.rpe.n} Punkten (Kriterium ≤ ${f(L.rpeMax, 2, lang)} Ω), Isolationswiderstand ${elecRange(e.iso, 'MΩ', lang)} bei ${e.iso.n} Messungen (Kriterium ≥ ${f(L.isoMin, 2, lang)} MΩ), kein Durchschlag bei ${e.hv.n} Spannungsprüfungen, Ableitstrom ${elecRange(e.hv, 'mA', lang)} (Kriterium ≤ ${f(L.hvMax, 2, lang)} mA) — bestanden (Abschnitt 12)`
+        tr: `EN 60204-1 Bölüm 18 testleri ${p.elec.date || '[tarih]'} tarihinde yapılmıştır: koruma iletkeni sürekliliği ${e.rpe.n} noktada ${elecRange(e.rpe, 'Ω', lang)} (ölçüt ≤ ${f(L.rpeMax, 2, lang)} Ω), yalıtım direnci ${e.iso.n} ölçümde ${elecRange(e.iso, 'MΩ', lang)} (ölçüt ≥ ${f(L.isoMin, 2, lang)} MΩ), gerilim dayanımında ${e.hv.n} ölçümde delinme olmamış, kaçak akım ${elecRange(e.hv, 'mA', lang)} (ölçüt ≤ ${f(L.hvMax, 2, lang)} mA) — uygun (${sec12(e, lang)})`,
+        en: `The EN 60204-1 Section 18 tests were carried out on ${p.elec.date || '[date]'}: protective bonding continuity ${elecRange(e.rpe, 'Ω', lang)} at ${e.rpe.n} points (criterion ≤ ${f(L.rpeMax, 2, lang)} Ω), insulation resistance ${elecRange(e.iso, 'MΩ', lang)} in ${e.iso.n} measurements (criterion ≥ ${f(L.isoMin, 2, lang)} MΩ), no breakdown in ${e.hv.n} voltage tests, leakage current ${elecRange(e.hv, 'mA', lang)} (criterion ≤ ${f(L.hvMax, 2, lang)} mA) — passed (${sec12(e, lang)})`,
+        de: `Die Prüfungen nach EN 60204-1 Abschnitt 18 wurden am ${p.elec.date || '[Datum]'} durchgeführt: Schutzleiterdurchgängigkeit ${elecRange(e.rpe, 'Ω', lang)} an ${e.rpe.n} Punkten (Kriterium ≤ ${f(L.rpeMax, 2, lang)} Ω), Isolationswiderstand ${elecRange(e.iso, 'MΩ', lang)} bei ${e.iso.n} Messungen (Kriterium ≥ ${f(L.isoMin, 2, lang)} MΩ), kein Durchschlag bei ${e.hv.n} Spannungsprüfungen, Ableitstrom ${elecRange(e.hv, 'mA', lang)} (Kriterium ≤ ${f(L.hvMax, 2, lang)} mA) — bestanden (${sec12(e, lang)})`
       };
       return T[lang];
     },
     elecFail: (e, p, lang) => {
       const parts = ['rpe', 'iso', 'hv'].filter((k) => e[k].fails).map((k) => `${{ rpe: 'R<sub>PE</sub>', iso: 'R<sub>ISO</sub>', hv: 'HV' }[k]} ${e[k].fails}`);
       return {
-        tr: `EN 60204-1 Bölüm 18 testlerinde ${e.fails} ölçüm ölçütü sağlamamıştır (${parts.join(', ')}; Bölüm 12); hata giderilmeli ve testler tekrarlanmalıdır`,
-        en: `In the EN 60204-1 Section 18 tests ${e.fails} measurements do not meet the criterion (${parts.join(', ')}; Section 12); the fault must be corrected and the tests repeated`,
-        de: `Bei den Prüfungen nach EN 60204-1 Abschnitt 18 erfüllen ${e.fails} Messungen das Kriterium nicht (${parts.join(', ')}; Abschnitt 12); der Fehler ist zu beheben und die Prüfungen sind zu wiederholen`
+        tr: `EN 60204-1 Bölüm 18 testlerinde ${e.fails} ölçüm ölçütü sağlamamıştır (${parts.join(', ')}; ${sec12(e, lang)}); hata giderilmeli ve testler tekrarlanmalıdır`,
+        en: `In the EN 60204-1 Section 18 tests ${e.fails} measurements do not meet the criterion (${parts.join(', ')}; ${sec12(e, lang)}); the fault must be corrected and the tests repeated`,
+        de: `Bei den Prüfungen nach EN 60204-1 Abschnitt 18 erfüllen ${e.fails} Messungen das Kriterium nicht (${parts.join(', ')}; ${sec12(e, lang)}); der Fehler ist zu beheben und die Prüfungen sind zu wiederholen`
       }[lang];
     },
     elecNone: (lang) => ({
@@ -339,6 +341,19 @@
         if (s.fails) c('error', `${{ rpe: 'R_PE', iso: 'Yalıtım', hv: 'Gerilim dayanım' }[k]}: ${s.fails} ölçüm ölçütü sağlamıyor`);
       }
       for (const k of ['rpe', 'iso', 'hv']) for (const r of p.elec[k]) if (r.value && !r.photo) c('info', `Elektrik ${k.toUpperCase()} ${r.tag}: ölçüm fotoğrafı yok`);
+      // LVD test raporu bağlantısı: ortak gövde iş no (= makine seri no), RA-<no>-NN ↔ LVD-<no>-NN
+      const LV = ev.lvd;
+      const core = String(m.job || '').trim();
+      const raNo = /^RA-(.+)-(\d{2,})$/.exec(String(m.docNo || '').trim());
+      if (!LV.length) c('info', "Bağlı LVD test raporu yok (EN 60204-1 §18 ayrıntılı test kaydı) — LVD Testleri'nden bu risk analizine bağlı rapor açılabilir");
+      for (const x of LV) {
+        const lv = /^LVD-(.+)-(\d{2,})$/.exec(String(x.docNo || '').trim());
+        if (core && String(x.serial || '').trim() !== core) c('warn', `${x.docNo}: makine seri no (${x.serial || '—'}) iş no ile (${core}) uyuşmuyor`);
+        else if (raNo && lv && raNo[1] !== lv[1]) c('warn', `Rapor numaraları farklı makineyi gösteriyor: ${m.docNo} ↔ ${x.docNo}`);
+        if (x.overall === 'fail') c('error', `${x.docNo}: LVD test sonucu UYGUN DEĞİL`);
+        else if (x.overall === 'open') c('warn', `${x.docNo}: LVD test raporu tamamlanmamış (zorunlu test açık)`);
+        if (m.status === 'final' && x.status !== 'final') c('warn', `${x.docNo} henüz taslak; risk analizi yayında`);
+      }
     }
     const G = ev.noise;
     if (G.any) {
@@ -400,6 +415,9 @@
     ev.ccf = C.ccfScore(p);
     ev.sf = p.sfs.map((sf) => C.evalSF(sf, p));
     ev.elec = evalElec(p);
+    // Bu risk analizine bağlı LVD test raporları (lvd/<klasör>/lvd.md, "risk analizi:" bu belge): RaLvd.summary özetleri
+    ev.lvd = (ctx && ctx.lvd) || [];
+    ev.elec.lvd = ev.lvd.map((x) => x.docNo).filter(Boolean).join(', ');
     ev.noise = evalNoise(p);
     ev.thermal = evalThermal(p);
     // Ek harfleri: A detay, B kurulum, C ölçüm ekranları; termal ve gürültü varsa sırayla D, E

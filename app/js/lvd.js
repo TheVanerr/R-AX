@@ -433,6 +433,14 @@
     if (!M.job) add('error', 'İş no yazılmamış (ön bilgi: no)');
     if (!M.model) add('error', 'Model yazılmamış (ön bilgi: model)');
     if (!M.serial) add('warn', 'Makine seri no yazılmamış (ön bilgi: makine seri no)');
+    // Rapor no: LVD-<seri no>-<test sırası>, başka LVD raporunda kullanılmamış olmalı
+    const dn = parseDocNo(M.docNo);
+    if (!M.docNo) add('error', 'Rapor no yazılmamış');
+    else if (!dn) add('warn', `Rapor no (${M.docNo}) LVD-<seri no>-<test sırası> biçiminde değil (ör. LVD-${M.serial || M.job || '0326066'}-00)`);
+    else if (M.serial && dn.serial !== String(M.serial).trim()) add('warn', `Rapor no (${M.docNo}) makine seri noyla (${M.serial}) uyuşmuyor`);
+    if (M.docNo && (o.docNos || []).includes(M.docNo)) add('error', `Rapor no ${M.docNo} başka bir LVD raporunda da kullanılıyor`);
+    const rd = /^RA-(.+)-(\d{2,})/.exec(String(M.riskDoc || '').trim());
+    if (rd && dn && rd[1] !== dn.serial) add('warn', `Risk analizi no (${M.riskDoc}) ile rapor no (${M.docNo}) farklı makineyi gösteriyor (ortak gövde makine seri no olmalı)`);
     if (!m.machine.supply) add('warn', 'Besleme gerilimi / faz / frekans yazılmamış (Makine: besleme)');
     if (!m.cond.date) add('warn', 'Test tarihi yazılmamış (Test Koşulları: tarih)');
     if (!m.cond.testedBy) add('warn', 'Test eden yazılmamış');
@@ -506,8 +514,41 @@
     return out;
   }
 
+  /** Risk analizinin gördüğü özet (bağlantı, atıf ve kontrol için): numara, rev, durum, seri no, test tarihi, genel sonuç, a–h durumları */
+  function summary(m, ev, dir) {
+    const e = ev || evaluate(m, { exists: () => true });
+    const tests = {};
+    for (const k of Object.keys(e.tests || {})) tests[k] = e.tests[k].state;
+    return { path: dir || m.dir || '', link: m.meta.link || '', docNo: m.meta.docNo || '', rev: m.meta.rev || '00', status: m.meta.status, serial: m.meta.serial || m.meta.job || '', job: m.meta.job || '', date: m.cond.date || '', reportDate: m.meta.reportDate || '', overall: e.overall, tests };
+  }
+
+  /* ─── Rapor no ve revizyon ──────────────────────────────── */
+  // Rapor no = LVD-<makine seri no>-<test sırası>; 00 fabrika testi, yeniden test bir sonraki sıra.
+  // Aynı testteki doküman düzeltmesi numarayı değiştirmez, revizyon (rev) artar.
+  const docNoFor = (serial, seq) => `LVD-${String(serial || '').trim()}-${U.pad2(seq || 0)}`;
+  function parseDocNo(s) {
+    const mm = /^LVD-(.+)-(\d{2,})$/.exec(String(s || '').trim());
+    return mm ? { serial: mm[1], seq: +mm[2] } : null;
+  }
+  /** Seri noya ait raporların kullandığı en büyük sıra + 1 (hiç yoksa 0) */
+  function nextSeq(docNos, serial) {
+    let max = -1;
+    for (const d of docNos || []) { const p = parseDocNo(d); if (p && p.serial === String(serial || '').trim()) max = Math.max(max, p.seq); }
+    return max + 1;
+  }
+  const REV_DOC = L3('Doküman düzeltmesi — test tekrarlanmamıştır', 'Document correction — test not repeated', 'Dokumentkorrektur — Prüfung nicht wiederholt');
+  /** Yeni revizyon: önceki revizyonların satırları tabloya sabitlenir, yeni satır eklenir, rapor taslağa döner */
+  function newRevision(m, o) {
+    m.revisions = revisions(m).map((r) => ({ rev: r.rev, date: r.date, desc: r.desc, by: r.by, approvedBy: r.approvedBy }));
+    m.meta.rev = o.rev;
+    if (o.date) m.meta.reportDate = o.date;
+    m.meta.status = 'draft';
+    m.revisions.push({ rev: o.rev, date: m.meta.reportDate, desc: o.desc && !isEmptyML(o.desc) ? o.desc : clone(REV_DOC), by: m.meta.approvals.prepared || '', approvedBy: m.meta.approvals.approved || '' });
+    return m;
+  }
+
   /* ─── model → md ────────────────────────────────────────── */
-  const esc1 = (s) => String(s == null ? '' : s).replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|').trim();
+  const esc1 =(s) => String(s == null ? '' : s).replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|').trim();
   const cell = (s) => String(s == null ? '' : s).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
   const relOf = (m, f) => (f && m.dir && f.startsWith(`${m.dir}/`) ? f.slice(m.dir.length + 1) : f || '');
   /** Çok dilli alan: kısa metin tek satırda " | " ile, uzun metin alt maddelerle */
@@ -687,7 +728,7 @@
     M.link = raPath;
     n += fill(M, 'job', R.job) + fill(M, 'customer', R.customer) + fill(M, 'model', R.model) + fill(M, 'year', R.year) + fill(M, 'manufacturer', R.manufacturer) + fill(M, 'brandName', R.brandName) + fill(M, 'brandLine', R.brandLine) + fill(M, 'preparedLogo', R.preparedLogo);
     if (R.brand && (!M.brand || M.brand === 'DOLFIN')) M.brand = R.brand;
-    if (R.docNo) M.riskDoc = `${R.docNo}${R.rev ? ` Rev. ${R.rev}` : ''}`;
+    if (R.docNo) M.riskDoc = R.docNo;
     if (R.langs && R.langs.length) M.langs = R.langs.slice();
     const A = R.approvals || {};
     for (const k of ['prepared', 'checked', 'approved']) {
@@ -772,11 +813,12 @@
   /** Yeni rapor: boş model + ön bilgi */
   function create(o) {
     const m = blank({ dir: o.dir });
-    Object.assign(m.meta, { job: o.job || '', customer: o.customer || '', model: o.model || '', serial: o.serial || o.job || '', reportDate: o.date || '', docNo: o.docNo || `LVD-${o.job || ''}-01`, link: o.link || '' });
+    const serial = o.serial || o.job || '';
+    Object.assign(m.meta, { job: o.job || '', customer: o.customer || '', model: o.model || '', serial, reportDate: o.date || '', docNo: o.docNo || docNoFor(serial, o.seq || 0), link: o.link || '' });
     if (o.prepared) m.meta.approvals.prepared = o.prepared;
     m.cond.date = o.date || '';
     return m;
   }
 
-  return { blank, parse, serialize, evaluate, evalRow, pwrRef, supplyNominal, ratedCurrent, tripOf, importRA, create, revisions, sectionKey, measKind, RESULT, STATUS, isEmptyML, toDate };
+  return { blank, parse, serialize, evaluate, evalRow, pwrRef, supplyNominal, ratedCurrent, tripOf, importRA, create, revisions, newRevision, summary, docNoFor, parseDocNo, nextSeq, REV_DOC, sectionKey, measKind, RESULT, STATUS, isEmptyML, toDate };
 });

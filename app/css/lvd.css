@@ -3,7 +3,10 @@
 /* ── Katman: risk analizi ekranının üstünde ── */
 .lvd { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
 .lvd > .home { flex: 1; min-height: 0; }
-.lvd-view { flex: 1; min-height: 0; display: grid; grid-template-columns: 268px minmax(0, 1fr) 316px; grid-template-rows: 54px minmax(0, 1fr) 30px; grid-template-areas: 'top top top' 'left canvas right' 'bottom bottom bottom'; }
+.lvd-view { flex: 1; min-height: 0; display: grid; grid-template-columns: 268px minmax(0, 1fr) 316px; grid-template-rows: 54px 40px minmax(0, 1fr) 30px; grid-template-areas: 'top top top' 'meta meta meta' 'left canvas right' 'bottom bottom bottom'; }
+.lvd-mb { overflow-x: auto; overflow-y: hidden; }
+.lvd-mb .mb-in.dirty { border-color: #d97706; }
+.lvd-mb .mb-state.err { color: #ff8585; }
 .lvd-studio { z-index: 70; }
 .lvd-modal { width: 520px; }
 #lvdStage, #lvdPrint { position: fixed; left: -30000px; top: 0; pointer-events: none; }

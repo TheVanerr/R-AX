@@ -29,6 +29,8 @@ R = O × Ş (5 × 5). **1–6 düşük** (kabul edilebilir) · **8–12 orta** (
 
 Parametreler md'de `R_PE:`, `R_ISO:`, `HV:` alanlarıyla değiştirilir. `>599,9` gibi değerler "üzerinde" olarak okunur.
 
+**Bağlı LVD test raporu.** `lvd/<klasör>/lvd.md` içinde `risk analizi: <bu belgenin yolu>` yazan rapor bu risk analizine bağlıdır (bağlantı yalnız LVD tarafında yazılır). Rapor numaralarının ortak gövdesi iş no = makine seri no: `RA-<no>-00` ↔ `LVD-<no>-00`. Bağlı rapor varsa doküman kontrol sayfasında **İlgili Dokümanlar** tablosu (numara, test tarihi, genel sonuç), Bölüm 12 başında atıf, artık gerilim satırında LVD sonucu, Bölüm 13 elektrik satırında ve ölçüme bağlı elektrik önlem cümlesinde LVD numarası yazılır. Atıf numarayla yapılır, rev yazılmaz (güncel revizyon geçerlidir); LVD'de doküman düzeltmesi risk analizine revizyon gerektirmez.
+
 ## 4. Gürültü — 2006/42/AT Ek I 1.7.4.2 (u), 2003/10/AT, EN ISO 11202
 
 1. **Arka plan düzeltmesi:** ΔL = L<sub>pA</sub> − arka plan. ΔL ≥ 10 dB → düzeltme yok; 3 ≤ ΔL < 10 dB → K<sub>1</sub> = −10·lg(1 − 10<sup>−0,1·ΔL</sup>) çıkarılır; ΔL < 3 dB → ölçüm geçersiz (hata).
@@ -86,6 +88,7 @@ Uygulamanın sağ panelinde ve `kontrol.mjs` çıktısında: ✗ hata · ! uyar�
 - Validasyon referansı yok / uygun değil sonucu
 - **Artık risk** orta (uyarı) veya yüksek (hata)
 - Elektrik değeri eksik / ölçüt dışı; gürültü geçersiz, L<sub>WA</sub> gerekli, sınır değer aşımı; termal sınır aşımı, okunamayan .bmt
+- LVD: bağlı rapor yok (bilgi); seri no iş noyla ya da numara gövdeleri uyuşmuyor (uyarı); LVD genel sonucu uygun değil (hata), açık (uyarı); risk analizi yayında, LVD taslak (uyarı)
 - Bulunamayan fotoğraf / termal dosya
 - EN ISO 12100 Tablo B.1 grubunda tehlike yok ve `## Uygulanamaz` gerekçesi yok
 - Ön bilgide seçili dillerde **eksik çeviri**

@@ -23,7 +23,15 @@ if (!fs.existsSync(file)) {
 }
 const rel = path.relative(ROOT, abs).split(path.sep).join('/');
 const m = Lvd.parse(fs.readFileSync(file, 'utf8'), rel);
-const ev = Lvd.evaluate(m, { exists: (f) => fs.existsSync(path.join(ROOT, f)) });
+// Aynı rapor no başka bir LVD raporunda kullanılıyor mu (yan klasörler)
+const docNos = [];
+for (const d of fs.readdirSync(path.dirname(abs), { withFileTypes: true })) {
+  const f = path.join(path.dirname(abs), d.name, 'lvd.md');
+  if (!d.isDirectory() || path.join(path.dirname(abs), d.name) === abs || !fs.existsSync(f)) continue;
+  const no = /^(?:dokuman|doküman|rapor no):\s*(.+)$/im.exec(fs.readFileSync(f, 'utf8'));
+  if (no) docNos.push(no[1].trim());
+}
+const ev = Lvd.evaluate(m, { exists: (f) => fs.existsSync(path.join(ROOT, f)), docNos });
 
 if (args.includes('--json')) {
   console.log(JSON.stringify({ meta: m.meta, overall: ev.overall, tests: Object.fromEntries(Object.entries(ev.tests).map(([k, t]) => [k, { state: t.state, n: t.n, fails: t.fails }])), checks: ev.checks }, null, 1));

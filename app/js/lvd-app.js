@@ -262,6 +262,18 @@
             <button type="button" class="icon-btn" id="lvdClose" title="LVD'yi kapat (risk analizine dön)">×</button>
           </div>
         </header>
+        <div class="metabar lvd-mb" id="lvdMeta">
+          <label class="mb-f mb-doc"><span>Rapor no</span><input class="mb-in" data-lmb="docNo" spellcheck="false" autocomplete="off" title="LVD-<seri no>-<test sırası> — kapakta ve her sayfanın antetinde yazar. Yeni test için yeni LVD raporu açılır."></label>
+          <label class="mb-f mb-rev"><span>Rev</span><input class="mb-in" data-lmb="rev" spellcheck="false" autocomplete="off" title="Daha büyük rev yazınca yeni revizyon açılır (doküman düzeltmesi, test tekrarlanmamıştır)"></label>
+          <label class="mb-f mb-date"><span>Tarih</span><input class="mb-in" data-lmb="reportDate" type="date" title="Rapor tarihi (kapak, onay ve revizyon tablosu)"></label>
+          <label class="mb-f mb-person"><span>Müşteri</span><input class="mb-in" data-lmb="customer" spellcheck="false" autocomplete="off"></label>
+          <label class="mb-f mb-person"><span>Hazırlayan</span><input class="mb-in" data-lmb="prepared" list="lvdPeople" spellcheck="false" autocomplete="off"></label>
+          <label class="mb-f mb-person"><span>Kontrol eden</span><input class="mb-in" data-lmb="checked" list="lvdPeople" spellcheck="false" autocomplete="off"></label>
+          <label class="mb-f mb-person"><span>Onaylayan</span><input class="mb-in" data-lmb="approved" list="lvdPeople" spellcheck="false" autocomplete="off"></label>
+          <label class="mb-f mb-status"><span>Durum</span><select class="mb-in" data-lmb="status" title="Kapaktaki damga: TASLAK / YAYINLANDI"><option value="draft">Taslak</option><option value="final">Yayın</option></select></label>
+          <span class="mb-state" id="lvdMbState"></span>
+          <datalist id="lvdPeople"></datalist>
+        </div>
         <aside class="left-panel">
           <nav class="panel-tabs"><button type="button" class="panel-tab active" data-lvl="toc">İçindekiler</button><button type="button" class="panel-tab" data-lvl="files">Dosyalar</button></nav>
           <section class="panel-body" id="lvdToc"></section>
@@ -383,6 +395,7 @@
       <div class="field-row"><div class="field"><label>İş no</label><input class="field-input" id="lnNo" placeholder="0426051"></div><div class="field"><label>Müşteri (kısa)</label><input class="field-input" id="lnCu" placeholder="ACME"></div></div>
       <div class="field-row"><div class="field"><label>Model</label><input class="field-input" id="lnMo" placeholder="KBN 2B 1200"></div><div class="field"><label>Makine seri no</label><input class="field-input" id="lnSn" placeholder="boşsa iş no"></div></div>
       <div class="field"><label>Test tarihi</label><input class="field-input" id="lnDate" value="${esc(todayStr())}"></div>
+      <div class="hint" id="lnDoc"></div>
       <div class="progress-text hidden" id="lnInfo"></div>
       <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn btn-primary" id="lnGo">Raporu oluştur</button></div>`, (box, close) => {
       const raSel = box.querySelector('#lnRa');
@@ -398,9 +411,25 @@
         customerFull = m.customer || '';
         box.querySelector('#lnMo').value = (e.kind === 'birim' ? ((e.model || {}).meta || {}).model : m.model) || '';
         box.querySelector('#lnSn').value = '';
+        showDoc();
       };
+      // Rapor no önizlemesi: LVD-<seri no>-<test sırası>; bu seri noya ait rapor yoksa 00 (fabrika testi)
+      const docNos = S.list.filter((x) => x.m).map((x) => x.m.meta.docNo);
+      const plan = () => {
+        const no = box.querySelector('#lnNo').value.trim();
+        const serial = box.querySelector('#lnSn').value.trim() || no;
+        const seq = LVD.nextSeq(docNos, serial);
+        return { serial, seq, docNo: serial ? LVD.docNoFor(serial, seq) : '' };
+      };
+      function showDoc() {
+        const p = plan();
+        box.querySelector('#lnDoc').innerHTML = p.docNo ? `Rapor no: <b>${esc(p.docNo)}</b> · Rev. 00 — ${p.seq === 0 ? 'bu makinenin ilk (fabrika) testi' : `bu makinenin ${p.seq + 1}. testi (önceki: ${esc(LVD.docNoFor(p.serial, p.seq - 1))})`}. Dokümandaki düzeltmeler numarayı değiştirmez, revizyon artar.` : 'Rapor no seri noya göre verilir: LVD-<seri no>-00 (fabrika testi).';
+      }
+      box.querySelector('#lnNo').addEventListener('input', showDoc);
+      box.querySelector('#lnSn').addEventListener('input', showDoc);
       raSel.onchange = prefill;
       if (presetLink) prefill();
+      showDoc();
       box.querySelector('[data-x]').onclick = close;
       box.querySelector('#lnGo').onclick = async () => {
         const no = box.querySelector('#lnNo').value.trim();
@@ -408,15 +437,20 @@
         const mo = box.querySelector('#lnMo').value.trim();
         if (!no || !mo) { toast('İş no ve model gerekli', true); return; }
         const link = raSel.value;
-        const dir = `${DIR}/${no}-${cuShort ? `${slug(cuShort)}-` : ''}${slug(mo)}`;
+        const p = plan();
+        // Aynı makinenin sonraki testi ayrı klasörde: …-01, …-02
+        const base = `${DIR}/${no}-${cuShort ? `${slug(cuShort)}-` : ''}${slug(mo)}`;
+        let dir = p.seq ? `${base}-${String(p.seq).padStart(2, '0')}` : base;
         const go = box.querySelector('#lnGo');
         const info = box.querySelector('#lnInfo');
         go.disabled = true;
         info.classList.remove('hidden');
         info.textContent = link ? 'Risk analizi okunuyor…' : 'Oluşturuluyor…';
         try {
+          if (docNos.includes(p.docNo)) throw new Error(`Rapor no ${p.docNo} başka bir LVD raporunda kullanılıyor`);
+          if (await store.exists(`${dir}/lvd.md`)) dir = `${base}-${String(p.seq).padStart(2, '0')}`;
           if (await store.exists(`${dir}/lvd.md`)) throw new Error(`Bu klasörde LVD raporu zaten var: ${dir}`);
-          const m = LVD.create({ dir, job: no, customer: customerFull || cuShort, model: mo, serial: box.querySelector('#lnSn').value.trim() || no, date: box.querySelector('#lnDate').value.trim(), link });
+          const m = LVD.create({ dir, job: no, customer: customerFull || cuShort, model: mo, serial: p.serial, seq: p.seq, date: box.querySelector('#lnDate').value.trim(), link });
           const ops = [];
           let log = [];
           if (link) {
@@ -448,6 +482,8 @@
     m.innerHTML = `${spin ? '<div class="spin"></div>' : ''}<div>${html}</div>`;
     m.classList.remove('hidden');
   }
+  /** Diğer LVD raporlarının numaraları (aynı numaranın iki kez kullanılmasını engellemek için) */
+  const otherDocNos = (path) => S.list.filter((x) => x.m && x.path !== path).map((x) => x.m.meta.docNo).filter(Boolean);
   async function loadReport(path) {
     const [text, walked] = await Promise.all([store.text(`${path}/lvd.md`), store.walk(path)]);
     S.files = walked.files;
@@ -455,7 +491,7 @@
     S.sig = walked.sig;
     S.m = LVD.parse(text, path);
     const known = new Set(S.files);
-    S.ev = LVD.evaluate(S.m, { exists: (f) => known.has(f) });
+    S.ev = LVD.evaluate(S.m, { exists: (f) => known.has(f), docNos: otherDocNos(path) });
   }
   async function openReport(path) {
     show('view');
@@ -500,6 +536,7 @@
     $('lvdImport').classList.toggle('hidden', !M.link);
     $('lvdToc').innerHTML = `<button type="button" class="toc-item cover" data-page="1"><span class="n">—</span><span>Kapak</span><span class="p">1</span></button>${r.toc.map((t) => `<button type="button" class="toc-item${t.sub ? ' sub' : ''}" data-page="${t.page}"><span class="n">${t.num}</span><span>${t.title}</span><span class="p">${t.page}</span></button>`).join('')}`;
     renderBanner();
+    fillMeta();
     renderSum();
     renderChecks();
     renderFiles();
@@ -571,6 +608,121 @@
         } catch (x) { toast(`Silinemedi: ${x.message}`, true); go.disabled = false; }
       };
     });
+  }
+
+  /* ─── Kapak ve antet bilgileri (üst çubuk) ──────────────── */
+  // Alandan çıkınca (ya da Enter) lvd.md'ye yazılır, kapak ve antet yenilenir. Rev yalnız artırılır: yeni revizyon = doküman düzeltmesi.
+  const PEOPLE = ['prepared', 'checked', 'approved'];
+  const isoDate = (d) => { const x = /^\s*(\d{1,2})[./-](\d{1,2})[./-](\d{4})\s*$/.exec(String(d || '')); return x ? `${x[3]}-${String(+x[2]).padStart(2, '0')}-${String(+x[1]).padStart(2, '0')}` : ''; };
+  const trDate = (iso) => { const x = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return x ? `${x[3]}.${x[2]}.${x[1]}` : ''; };
+  const mbCur = (k) => { const M = S.m.meta; return PEOPLE.includes(k) ? M.approvals[k] || '' : k === 'reportDate' ? isoDate(M.reportDate) : M[k] || ''; };
+  /** Raporlarda geçen kişiler ve unvanları (yeni kişi seçilince unvan buradan gelir) */
+  function knownPeople() {
+    const out = {};
+    for (const x of [...S.list.map((y) => y.m).filter(Boolean), S.m].filter(Boolean)) {
+      const A = x.meta.approvals || {};
+      for (const k of PEOPLE) if (A[k] && A.titles && A.titles[k] && !LVD.isEmptyML(A.titles[k]) && !out[A[k]]) out[A[k]] = A.titles[k];
+    }
+    return out;
+  }
+  function fillMeta() {
+    if (!S.m) return;
+    document.querySelectorAll('#lvdMeta [data-lmb]').forEach((i) => { i.value = mbCur(i.dataset.lmb); i.classList.remove('dirty'); });
+    $('lvdPeople').innerHTML = Object.keys(knownPeople()).map((n) => `<option value="${esc(n)}">`).join('');
+  }
+  function titleDialog(name) {
+    return new Promise((resolve) => {
+      let done = false;
+      const fin = (v) => { if (!done) { done = true; resolve(v); } };
+      modal(`<h2>Unvan — ${esc(name)}</h2><p>Bu kişi daha önce LVD raporlarında geçmiyor. Kapakta ve onay tablosunda adın altında yazacak unvanı girin (TR | EN | DE).</p>
+        <div class="field"><input class="field-input" id="ltTitle" placeholder="Kalite Kontrol Sorumlusu | Quality Control Officer | Qualitätskontrollverantwortlicher"></div>
+        <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn" id="ltNone">Unvansız</button><button type="button" class="btn btn-primary" id="ltGo">Kaydet</button></div>`, (box, close) => {
+        box.querySelector('[data-x]').onclick = () => { fin(null); close(); };
+        box.querySelector('#ltNone').onclick = () => { fin(L3('', '', '')); close(); };
+        box.querySelector('#ltGo').onclick = () => { const v = box.querySelector('#ltTitle').value.trim(); fin(v ? Md.splitLangs(v) : L3('', '', '')); close(); };
+        box.closest('.modal-overlay').addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) fin(null); });
+      });
+    });
+  }
+  function revisionDialog(rev) {
+    return new Promise((resolve) => {
+      let done = false;
+      const fin = (v) => { if (!done) { done = true; resolve(v); } };
+      const D = LVD.REV_DOC;
+      modal(`<h2>Yeni revizyon — Rev. ${esc(rev)}</h2>
+        <p>Rapor no aynı kalır (<b>${esc(S.m.meta.docNo)}</b>); revizyon <b>dokümandaki bir düzeltme</b> içindir, test tekrarlanmamıştır. Yeni test yapıldıysa revizyon yerine <b>+ Yeni LVD raporu</b> açın: numara bir sonraki sırayla verilir.</p>
+        <div class="field"><label>Revizyon tarihi</label><input class="field-input" id="lrDate" type="date" value="${esc(isoDate(todayStr()))}"></div>
+        ${['tr', 'en', 'de'].map((l) => `<div class="field"><label>Açıklama — ${LANG_NAMES[l]}</label><input class="field-input" id="lrDesc-${l}" value="${esc(D[l])}"></div>`).join('')}
+        <div class="hint">Ne düzeltildiğini ekleyin, ör. "Doküman düzeltmesi — test tekrarlanmamıştır; makine seri no düzeltildi". Rapor taslağa döner; onaylanınca durumu Yayın yapın.</div>
+        <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn btn-primary" id="lrGo">Revizyonu aç</button></div>`, (box, close) => {
+        box.querySelector('[data-x]').onclick = () => { fin(null); close(); };
+        box.querySelector('#lrGo').onclick = () => {
+          const desc = {};
+          for (const l of ['tr', 'en', 'de']) { const v = box.querySelector(`#lrDesc-${l}`).value.trim(); if (v) desc[l] = v; }
+          fin({ date: trDate(box.querySelector('#lrDate').value) || todayStr(), desc: Object.assign({ tr: '' }, desc) });
+          close();
+        };
+        box.closest('.modal-overlay').addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) fin(null); });
+      });
+    });
+  }
+  async function saveModel(m, msg) {
+    S.busy = true;
+    $('lvdMbState').textContent = 'kaydediliyor…';
+    $('lvdMbState').className = 'mb-state';
+    try {
+      await store.write(`${m.dir}/lvd.md`, LVD.serialize(m));
+      await loadReport(m.dir);
+      const it = S.list.find((x) => x.path === m.dir);
+      if (it) { it.m = S.m; it.ev = S.ev; }
+      renderDoc(true);
+      $('lvdMbState').textContent = msg || 'kaydedildi';
+    } catch (x) {
+      $('lvdMbState').textContent = `kaydedilemedi: ${x.message}`;
+      $('lvdMbState').className = 'mb-state err';
+      fillMeta();
+    } finally { S.busy = false; }
+  }
+  let mbBusy = false;
+  async function commitMeta(inp) {
+    if (!S.m || mbBusy) return;
+    const k = inp.dataset.lmb;
+    const raw = k === 'reportDate' ? inp.value : inp.value.replace(/\s+/g, ' ').trim();
+    if (raw === mbCur(k)) { inp.classList.remove('dirty'); return; }
+    const revert = (msg) => { inp.value = mbCur(k); inp.classList.remove('dirty'); if (msg) toast(msg, true); };
+    const m = clone(S.m);
+    const M = m.meta;
+    mbBusy = true;
+    try {
+      if (k === 'docNo') {
+        if (!raw) return revert('Rapor no boş olamaz');
+        if (otherDocNos(S.path).includes(raw)) return revert(`${raw} başka bir LVD raporunda kullanılıyor`);
+        if (!LVD.parseDocNo(raw) && !window.confirm(`"${raw}" LVD-<seri no>-<test sırası> biçiminde değil (ör. ${LVD.docNoFor(M.serial || M.job, 0)}). Yine de kaydedilsin mi?`)) return revert();
+        M.docNo = raw;
+      } else if (k === 'rev') {
+        if (!/^\d{1,3}$/.test(raw)) return revert('Rev yalnız sayı olabilir (00, 01, 02 …)');
+        if (+raw <= +(M.rev || 0)) return revert(`Revizyon yalnız artırılabilir (şu an Rev. ${M.rev}). Yeni test için + Yeni LVD raporu açın.`);
+        const rev = String(+raw).padStart(2, '0');
+        const r = await revisionDialog(rev);
+        if (!r) return revert();
+        LVD.newRevision(m, { rev, date: r.date, desc: r.desc });
+      } else if (PEOPLE.includes(k)) {
+        M.approvals[k] = raw;
+        if (!raw) delete M.approvals.titles[k];
+        else {
+          const known = knownPeople()[raw];
+          if (known) M.approvals.titles[k] = clone(known);
+          else {
+            const t = await titleDialog(raw);
+            if (t === null) return revert();
+            M.approvals.titles[k] = t;
+          }
+        }
+      } else if (k === 'reportDate') {
+        M.reportDate = trDate(raw);
+      } else M[k] = raw;
+      await saveModel(m, k === 'rev' ? `Rev. ${M.rev} açıldı` : 'kaydedildi');
+    } finally { mbBusy = false; }
   }
 
   /* ─── Yakınlaştırma ─────────────────────────────────────── */
@@ -819,8 +971,8 @@
     return `
       <div class="ms-card"><h3>Rapor bilgileri <small>kapak, antet ve onay</small></h3><div class="ms-grid">
         ${field('İş no', inp('meta.job', M.job))}${field('Müşteri', inp('meta.customer', M.customer))}${field('Model', inp('meta.model', M.model))}${field('Makine seri no', inp('meta.serial', M.serial, '', 'boşsa iş no'))}${field('İmal yılı', inp('meta.year', M.year))}
-        ${field('Rapor no', inp('meta.docNo', M.docNo))}${field('Rev', inp('meta.rev', M.rev))}${field('Rapor tarihi', inp('meta.reportDate', M.reportDate, '', 'GG.AA.YYYY'))}${field('Durum', sel('meta.status', M.status, [['draft', 'Taslak'], ['final', 'Yayın']]))}${field('Diller', inp('meta.langsStr', (M.langs || []).join(', '), '', 'tr, en, de'))}
-        ${field('Hazırlayan', inp('meta.approvals.prepared', A.prepared))}${field('Kontrol eden', inp('meta.approvals.checked', A.checked))}${field('Onaylayan', inp('meta.approvals.approved', A.approved))}
+        ${field('Diller', inp('meta.langsStr', (M.langs || []).join(', '), '', 'tr, en, de'))}
+        <div class="hint lv-wide" style="align-self:center">Rapor no (<b>${esc(M.docNo || '—')}</b>), Rev. ${esc(M.rev || '00')}, rapor tarihi, durum ve imza sahipleri (${esc([A.prepared, A.checked, A.approved].filter(Boolean).join(' · ') || '—')}) raporun üstündeki bilgi çubuğundan değiştirilir.</div>
         ${sig('prepared', 'İmza — hazırlayan')}${sig('checked', 'İmza — kontrol eden')}${sig('approved', 'İmza — onaylayan')}
       </div></div>
       <div class="ms-card"><h3>Risk analizi bağlantısı <small>yalnız okunur · aktarım yalnız boş alanları doldurur</small></h3>
@@ -956,6 +1108,7 @@
 
   /* Kaydet */
   async function saveW(ops, closeAfter) {
+    if (W.meta.docNo && otherDocNos(W.dir).includes(W.meta.docNo)) { toast(`${W.meta.docNo} başka bir LVD raporunda kullanılıyor; rapor no'yu üst çubuktan değiştirin`, true); }
     S.busy = true;
     try {
       await Promise.all([store.write(`${W.dir}/lvd.md`, LVD.serialize(W)), ...(ops || [])]);
@@ -1096,7 +1249,7 @@
     if (k === 'meta.link') {
       const E = (root.RaApp && root.RaApp.state.entries) || { projects: [], units: [] };
       const e = [...E.projects, ...E.units].find((x) => x.path === t.value);
-      if (e && e.meta && e.meta.docNo) W.meta.riskDoc = `${e.meta.docNo}${e.meta.rev ? ` Rev. ${e.meta.rev}` : ''}`;
+      if (e && e.meta && e.meta.docNo) W.meta.riskDoc = e.meta.docNo;
       if (!t.value) W.meta.riskDoc = '';
       const btn = $('lvdStudio').querySelector('[data-act="import"]');
       if (btn) btn.disabled = !t.value;
@@ -1176,6 +1329,14 @@
 
   /* ─── Olaylar ───────────────────────────────────────────── */
   function bind() {
+    const mb = $('lvdMeta');
+    mb.addEventListener('input', (e) => { const i = e.target; if (i.dataset.lmb) i.classList.toggle('dirty', (i.dataset.lmb === 'reportDate' ? i.value : i.value.trim()) !== mbCur(i.dataset.lmb)); });
+    mb.addEventListener('change', (e) => { if (e.target.dataset.lmb) commitMeta(e.target); });
+    mb.addEventListener('keydown', (e) => {
+      if (!e.target.dataset.lmb) return;
+      if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+      if (e.key === 'Escape') { e.target.value = mbCur(e.target.dataset.lmb); e.target.classList.remove('dirty'); e.target.blur(); }
+    });
     $('lvdBack').onclick = closeAll;
     $('lvdRefresh').onclick = async () => { try { await store.refresh(true); } catch (e) { /* yok */ } await openList(); toast('LVD raporları yeniden okundu'); };
     $('lvdNew').onclick = () => newDialog('');
