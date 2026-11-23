@@ -26,7 +26,7 @@ git --git-dir=.veri.git push origin main                  # uygulama 15 sn için
 
 `add` için `-f` gerekir: kök `.gitignore` kod deposunu korumak için `projects/`, `models/` ve `lvd/` klasörlerini dışlar ve veri deposu da aynı çalışma klasörünü kullanır. `.gitignore`'dan bu satırları silme. Eklemeden önce `add -n` (kuru çalıştırma) ile listeye bak.
 
-Kullanıcı uygulamadan proje / makine raporu silebilir (onay: `TheVanerr/<klasör adı>` tam yazılır; commit "Silindi: <yol>"). Yanlışlıkla silineni geri getirmek için: `git --git-dir=.veri.git pull --rebase`, sonra `git --git-dir=.veri.git log --diff-filter=D --oneline -- "<yol>"` ile silme commit'ini bul, `git --git-dir=.veri.git checkout <commit>^ -- "<yol>"` ile geri al, ekle / commit / gönder.
+Kullanıcı uygulamadan proje / makine raporu / LVD raporu silebilir (ana ekran kartında veya üst çubukta **Sil**; onay: `<klasör adı> / Onaylıyorum` yazılır; commit "Silindi: <yol>"). Yanlışlıkla silineni geri getirmek için: `git --git-dir=.veri.git pull --rebase`, sonra `git --git-dir=.veri.git log --diff-filter=D --oneline -- "<yol>"` ile silme commit'ini bul, `git --git-dir=.veri.git checkout <commit>^ -- "<yol>"` ile geri al, ekle / commit / gönder.
 
 Göndermeden önce deponun gizli olduğunu doğrula — oturumsuz istek **404** dönmeli (200 = herkese açık, müşteri verisi gönderilmez):
 `curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/TheVanerr/riskanalizix-veri`

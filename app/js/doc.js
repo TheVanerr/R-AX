@@ -364,6 +364,8 @@
     if (!k) return '';
     if (/^(ud|uygun degil|nok|f|fail|failed|nb|x)$/.test(k) || /uygun degil|nicht/.test(k)) return 'nok';
     if (/^(u|uygun|ok|p|pass|passed|b|bestanden|evet)$/.test(k) || String(s).trim() === '✓') return 'ok';
+    // Sonuç yerine test notuna yönlendirme: "Açıklamaya bakınız" / "See note" / "Siehe Hinweis"
+    if (/aciklama|bakiniz|bkz|see note|siehe/.test(k)) return 'see';
     return '';
   };
   S.validasyon = (n, p) => {
@@ -832,7 +834,7 @@
       L.push('# Validasyon');
       for (const v of val) {
         L.push(`## ${v.id}`);
-        L.push(`- sonuç: ${v.result === 'ok' ? 'U' : v.result === 'nok' ? 'UD' : ''}`);
+        L.push(`- sonuç: ${v.result === 'ok' ? 'U' : v.result === 'nok' ? 'UD' : v.result === 'see' ? 'Açıklamaya bakınız' : ''}`);
         if (v.date) L.push(`- tarih: ${v.date}`);
         if (v.note && v.note.tr) L.push(`- not: ${mlLine(v.note)}`);
         L.push('');

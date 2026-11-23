@@ -299,12 +299,15 @@
 
     /* ---------- 11 VALİDASYON ---------- */
     {
-      const rows = p.validation.map((v) => `<tr><td class="c">${v.id}</td><td>${refNo(v.ref) || '—'}</td><td>${X(v.step)}</td><td>${X(v.expected)}</td><td class="c">${v.result === 'ok' ? pill(true, L.valOk) : v.result === 'nok' ? pill(false, L.valNok) : L.valEmpty}</td><td>${esc(v.date)}</td></tr>`
+      const rows = p.validation.map((v) => `<tr><td class="c">${v.id}</td><td>${refNo(v.ref) || '—'}</td><td>${X(v.step)}</td><td>${X(v.expected)}</td><td class="c">${v.result === 'ok' ? pill(true, L.valOk) : v.result === 'nok' ? pill(false, L.valNok) : v.result === 'see' ? pill(null, L.valSee) : L.valEmpty}</td><td>${esc(v.date)}</td></tr>`
         + (Xn(v.note) ? `<tr class="noterow"><td></td><td></td><td colspan="4" class="small"><b>${NOTE[lang]}:</b> ${Xn(v.note)}</td></tr>` : '')).join('') || emptyRow(6, NO_ROWS[lang]);
+      // "Uygun değil" ifadesi yalnız UD veya boş sonuç varsa yazılır; "Açıklamaya bakınız" sonuçları nota yönlendirilir
+      const vOpen = p.validation.some((v) => v.result === 'nok' || !v.result);
+      const p11 = !p.validation.some((v) => v.result) ? L.p11 : vOpen ? L.p11done : `${L.p11doneAll}${p.validation.some((v) => v.result === 'see') ? ` ${L.p11see}` : ''}`;
       sections.push({ newPage: true, html: `
-        ${h2('11', L.s11, L.s11ref)}<p>${p.validation.some((v) => v.result) ? L.p11done : L.p11}</p>
+        ${h2('11', L.s11, L.s11ref)}<p>${p11}</p>
         <table class="t small split"><thead><tr><th class="c" style="width:11mm">${L.valCols[0]}</th><th style="width:13mm">${L.valCols[1]}</th><th>${L.valCols[2]}</th><th style="width:52mm">${L.valCols[3]}</th><th class="c" style="width:28mm">${L.valCols[4]}</th><th style="width:18mm">${L.valCols[5]}</th></tr></thead><tbody>${rows}</tbody></table>
-        <p class="small muted">${L.valFoot}</p>` });
+        <p class="small muted">${vOpen ? L.valFoot : L.valFootTest}</p>` });
     }
 
     /* ---------- 12 ELEKTRİK TESTLERİ ---------- */

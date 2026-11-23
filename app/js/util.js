@@ -61,5 +61,12 @@
     return out.join('/');
   }
 
-  return { esc, pad2, todayStr, strip, rich, parseNum, num, fmtDec, fmtInt, safeName, joinPath };
+  /** Rapor silme onayı (risk analizi ve LVD): "<raporun tam adı> / Onaylıyorum" yazılmadan sil düğmesi açılmaz.
+      Eğik çizgi çevresindeki boşluk, fazla boşluk ve büyük / küçük harf farkı önemsenmez; ad ve kelime aynı olmalıdır. */
+  const delPhrase = (name) => `${name} / Onaylıyorum`;
+  // Türkçe küçük harf: I → ı, İ → i; ad Latin harfli olabileceğinden (TESTI ↔ testi) ı ile i aynı sayılır
+  const delNorm = (s) => String(s || '').replace(/\s*\/\s*/g, ' / ').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr').replace(/ı/g, 'i');
+  const delOk = (input, name) => delNorm(input) === delNorm(delPhrase(name));
+
+  return { esc, pad2, todayStr, strip, rich, parseNum, num, fmtDec, fmtInt, safeName, joinPath, delPhrase, delOk };
 });

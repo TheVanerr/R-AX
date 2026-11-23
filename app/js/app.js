@@ -306,6 +306,8 @@
     if (s.termografi) c.push('<span class="pc-chip has">Termal</span>');
     return c.join('');
   }
+  /** Ana ekran kartındaki Sil: onay penceresini açar (kartı açmaz) */
+  const delBtn = (e) => (canDelete(e) ? `<span class="pc-del" data-del="${esc(e.path)}" role="button" tabindex="0" title="Bu raporu sil (onay: ${esc(e.name)} / Onaylıyorum)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Sil</span>` : '');
   function renderHome() {
     const { projects, models } = S.entries;
     $('countProjects').textContent = projects.length;
@@ -320,17 +322,17 @@
     if (S.homeTab === 'projects') {
       list.innerHTML = projects.length ? projects.slice().sort((a, b) => (b.mtime || 0) - (a.mtime || 0)).map((e) => {
         const m = e.meta || {};
-        if (e.empty) return `<button type="button" class="project-card empty" data-open="${esc(e.path)}"><span class="pc-bar"></span><div class="pc-no">${esc(e.name)}</div><div class="pc-customer">md dosyası yok — proje henüz yazılmadı</div></button>`;
-        return `<button type="button" class="project-card" data-open="${esc(e.path)}"><span class="pc-bar"></span>
+        if (e.empty) return `<div class="project-card empty has-del" data-open="${esc(e.path)}" role="button" tabindex="0"><span class="pc-bar"></span>${delBtn(e)}<div class="pc-no">${esc(e.name)}</div><div class="pc-customer">md dosyası yok — proje henüz yazılmadı</div></div>`;
+        return `<div class="project-card has-del" data-open="${esc(e.path)}" role="button" tabindex="0"><span class="pc-bar"></span>${delBtn(e)}
           <div class="pc-no">${esc(m.job || e.name)}</div><div class="pc-model">${esc(m.model || '')}</div><div class="pc-customer">${esc(m.customer || '')}</div>
           <div class="pc-chips">${chipsFor(e)}</div>
-          <div class="pc-meta">${esc(m.docNo || '')} · ${esc(m.reportDate || '')} · değişiklik ${esc(fmtTime(e.mtime))}</div></button>`;
+          <div class="pc-meta">${esc(m.docNo || '')} · ${esc(m.reportDate || '')} · değişiklik ${esc(fmtTime(e.mtime))}</div></div>`;
       }).join('') : '<div class="home-empty">projects klasöründe proje yok. "+ Yeni proje" ile iskelet oluşturun ya da verileri Claude\'a verin.</div>';
     } else {
       const fams = [...new Set(models.map((m) => m.family))];
       list.innerHTML = fams.map((f) => `<div class="list-head">${esc(f)}<span></span></div>${models.filter((m) => m.family === f).map((e) => {
         const m = e.meta || {};
-        const units = e.units.slice(0, 4).map((u) => `<div class="pc-unit" data-open="${esc(u.path)}"><span><b>${esc((u.meta || {}).job || u.name)}</b> · ${esc((u.meta || {}).customer || '')}</span><span>${(u.meta || {}).status === 'final' ? '<i class="ok">yayın</i> ' : ''}${esc((u.meta || {}).reportDate || '')}</span></div>`).join('');
+        const units = e.units.slice(0, 4).map((u) => `<div class="pc-unit" data-open="${esc(u.path)}"><span><b>${esc((u.meta || {}).job || u.name)}</b> · ${esc((u.meta || {}).customer || '')}</span><span>${(u.meta || {}).status === 'final' ? '<i class="ok">yayın</i> ' : ''}${esc((u.meta || {}).reportDate || '')}<i class="pc-unit-del" data-del="${esc(u.path)}" role="button" tabindex="0" title="Bu makine raporunu sil (onay: ${esc(u.name)} / Onaylıyorum)">Sil</i></span></div>`).join('');
         return `<div class="project-card${e.empty ? ' empty' : ''}" data-open="${esc(e.path)}" role="button" tabindex="0"><span class="pc-bar"></span>
           <div class="pc-no">${esc(m.model || e.name)}</div><div class="pc-customer">${e.empty ? 'Şablon hazırlanmadı — model bilgilerini Claude\'a verin' : `Model şablonu · ${e.units.length} makine raporu`}</div>
           ${e.empty ? '' : `<div class="pc-chips"><span class="pc-chip dark">şablon rev ${esc(m.templateRev || '00')}</span>${chipsFor(e)}</div>`}
@@ -565,6 +567,7 @@
     $('raDocSwitch').classList.add('hidden');
     $('pathInfo').textContent = entry.path;
     $('btnMeasure').classList.toggle('hidden', entry.kind !== 'birim');
+    $('btnDelete').classList.toggle('hidden', !canDelete(entry));
     $('btnNewUnit').classList.toggle('hidden', entry.kind !== 'model' && entry.kind !== 'birim');
     $('btnNewUnit').classList.toggle('btn-primary', entry.kind === 'model');
     $('btnMeasure').classList.toggle('btn-primary', entry.kind === 'birim');
@@ -732,8 +735,9 @@
   }
 
   /* ─── Rapor silme ───────────────────────────────────────── */
-  // GitHub'daki depo silme gibi: raporun tam adı ("TheVanerr/0426998-DENEME LTD") harfi harfine yazılmadan düğme açılmaz.
+  // Onay: "<raporun tam adı> / Onaylıyorum" (ör. "0326069-KSYSTE-KBN 1B 1850 / Onaylıyorum") yazılmadan düğme açılmaz (RaUtil.delOk).
   // Yalnız proje (projects/<ad>) ve makine raporu (models/…/raporlar/<ad>) silinir; model şablonu uygulamadan silinmez.
+  // Açılış: üst çubuktaki Sil, ana ekrandaki kartların Sil'i, Dosyalar sekmesindeki Tehlikeli bölge, model sayfasındaki makine raporu listesi.
   const canDelete = (e) => !!e && ((e.kind === 'proje' && /^projects\/[^/]+$/.test(e.path)) || (e.kind === 'birim' && /^models\/.+\/raporlar\/[^/]+$/.test(e.path)));
   const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
   async function filesUnder(dir) {
@@ -749,8 +753,8 @@
     const e = target || S.entry;
     if (!canDelete(e)) return;
     const isOpen = !!S.entry && S.entry.path === e.path;
-    const owner = store.mode === 'github' ? String(store.name || '').split('/')[0] : 'R&AX';
-    const phrase = `${owner}/${e.name}`;
+    const phrase = root.RaUtil.delPhrase(e.name);
+    const ok = (v) => root.RaUtil.delOk(v, e.name);
     let files = [];
     try { files = await filesUnder(e.path); } catch (x) { files = []; }
     const size = files.reduce((n, f) => n + f.size, 0);
@@ -765,17 +769,17 @@
     modal(`<h2 class="danger">Raporu sil</h2>
       <p><b>${esc(m.docNo || e.name)}</b>${m.customer ? ` · ${esc(m.customer)}` : ''} — ${what}${m.status === 'final' ? ` · <b>yayınlanmış (Rev ${esc(m.rev || '00')})</b>` : ''}</p>
       <div class="del-warn"><b>${files.length} dosya</b> (${fmtSize(size)}) silinir${detail ? `: ${detail}` : ''}${e.frozen ? ' (dondurulmuş şablon kopyası dahil)' : ''}.<br>Klasör: <code>${esc(e.path)}</code><br>${gh ? "Silme depoya kayıt (commit) olarak gider. Dosyalar GitHub geçmişinde kalır; yanlışlıkla silinirse Claude geri getirebilir." : "Dosyalar bilgisayardan <b>kalıcı olarak</b> silinir, Geri Dönüşüm Kutusu'na gitmez."}</div>
-      <label class="del-label" for="delIn">Onaylamak için aşağıya <b class="del-phrase">${esc(phrase)}</b> yazın:</label>
+      <label class="del-label" for="delIn">Onaylamak için raporun tam adını ve ardından <b>/ Onaylıyorum</b> yazın:<br><b class="del-phrase">${esc(phrase)}</b></label>
       <input class="field-input" id="delIn" autocomplete="off" spellcheck="false">
       <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn btn-danger" id="delGo" disabled>Bu raporu sil</button></div>`, (box, close) => {
       const inp = box.querySelector('#delIn');
       const go = box.querySelector('#delGo');
       box.querySelector('[data-x]').onclick = close;
-      // Harfi harfine (büyük / küçük harf, boşluk) aynı olmalı
-      inp.addEventListener('input', () => { go.disabled = inp.value !== phrase; });
+      // Ad ve "Onaylıyorum" aynı olmalı (boşluk ve büyük / küçük harf farkı önemsenmez)
+      inp.addEventListener('input', () => { go.disabled = !ok(inp.value); });
       inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !go.disabled) go.click(); });
       go.onclick = async () => {
-        if (inp.value !== phrase || !canDelete(e)) return;
+        if (!ok(inp.value) || !canDelete(e)) return;
         go.disabled = true;
         inp.disabled = true;
         go.textContent = 'Siliniyor…';
@@ -793,18 +797,19 @@
             await scan();
             showHome();
           } else {
-            // Model sayfasından silindi: sayfada kalınır, makine raporları listesi yenilenir
+            // Ana ekrandan ya da model sayfasından silindi: o ekranda kalınır, liste yenilenir
             const cur = S.entry && S.entry.path;
             await scan();
             if (cur) S.entry = findEntry(cur) || S.entry;
             if (S.doc) renderFiles();
+            if (!$('home').classList.contains('hidden')) renderHome();
           }
-          toast(`${phrase} silindi`);
+          toast(`${e.name} silindi`);
         } catch (x) {
           toast(`Silinemedi: ${x.message}`, true);
           go.textContent = 'Bu raporu sil';
           inp.disabled = false;
-          go.disabled = inp.value !== phrase;
+          go.disabled = !ok(inp.value);
         }
       };
     });
@@ -1161,13 +1166,13 @@
       const dirs = Object.entries(counts).filter(([k]) => k !== '.').map(([k, n]) => `<div class="file-row"><span>${esc(k)}/</span><span class="t">${n} dosya</span></div>`).join('');
       return `<div class="file-group"><h3>${i === 0 && d.sources.length > 1 ? 'Model şablonu' : d.sources.length > 1 ? 'Makine raporu' : 'Belge'} <span class="file-count">${esc(s.dir.split('/').pop())}</span></h3>${md}${dirs}</div>`;
     }).join('');
-    let del = canDelete(S.entry) ? `<div class="danger-zone"><h3>Tehlikeli bölge</h3><p>${S.entry.kind === 'birim' ? 'Bu makine raporunun' : 'Bu projenin'} klasörü ve içindeki bütün dosyalar silinir. Onay için raporun tam adı yazılır.</p><button type="button" class="btn btn-sm btn-danger-line" id="btnDeleteDoc">Raporu sil…</button></div>` : '';
+    let del = canDelete(S.entry) ? `<div class="danger-zone"><h3>Tehlikeli bölge</h3><p>${S.entry.kind === 'birim' ? 'Bu makine raporunun' : 'Bu projenin'} klasörü ve içindeki bütün dosyalar silinir. Onay için “<b>raporun tam adı / Onaylıyorum</b>” yazılır.</p><button type="button" class="btn btn-sm btn-danger-line" id="btnDeleteDoc">Raporu sil…</button></div>` : '';
     if (S.entry && S.entry.kind === 'model') {
       // Model sayfası: bu modelin makine raporları (aç / sil); şablonun kendisi uygulamadan silinmez
       const us = S.entry.units || [];
       del = `<div class="unit-box"><h3>Makine raporları <span class="file-count">${us.length}</span></h3>
-        ${us.map((u) => { const um = u.meta || {}; return `<div class="unit-row"><button type="button" class="unit-open" data-open-unit="${esc(u.path)}" title="Raporu aç"><b>${esc(um.job || u.name)}</b> · ${esc(um.customer || '')}${um.status === 'final' ? ' <i class="ok">yayın</i>' : ''}</button><button type="button" class="btn btn-sm btn-danger-line" data-del-unit="${esc(u.path)}" title="Bu makine raporunu sil (onay için tam adı yazılır)">Sil…</button></div>`; }).join('') || '<div class="file-note">Bu modelden henüz makine raporu açılmadı.</div>'}
-        <p class="file-note">Model şablonunun kendisi uygulamadan silinmez. Makine raporu silinirken raporun tam adı yazılır.</p></div>`;
+        ${us.map((u) => { const um = u.meta || {}; return `<div class="unit-row"><button type="button" class="unit-open" data-open-unit="${esc(u.path)}" title="Raporu aç"><b>${esc(um.job || u.name)}</b> · ${esc(um.customer || '')}${um.status === 'final' ? ' <i class="ok">yayın</i>' : ''}</button><button type="button" class="btn btn-sm btn-danger-line" data-del-unit="${esc(u.path)}" title="Bu makine raporunu sil (onay: raporun tam adı / Onaylıyorum)">Sil…</button></div>`; }).join('') || '<div class="file-note">Bu modelden henüz makine raporu açılmadı.</div>'}
+        <p class="file-note">Model şablonunun kendisi uygulamadan silinmez. Makine raporu silinirken “raporun tam adı / Onaylıyorum” yazılır.</p></div>`;
     }
     $('leftFiles').innerHTML = `<div class="file-note">Rapor bu md dosyalarından oluşur. Dosya değişince rapor birkaç saniye içinde kendiliğinden yenilenir.</div>${groups}<div class="file-note">Klasör: <code>${esc(d.sources[d.sources.length - 1].dir)}</code></div>${del}`;
   }
@@ -1705,7 +1710,7 @@ hazirlayan: Fatih GÜRAL
       if (tab === 'val') {
         return `<div class="ms-card"><h3>Validasyon testleri <small>EN ISO 13849-2 · U uygun / UD uygun değil</small></h3>
           <table class="ms-table"><thead><tr><th>No</th><th>Ref</th><th>Adım / beklenen</th><th>Sonuç</th><th>Tarih</th><th>Not</th></tr></thead><tbody>
-          ${M.validation.map((v, i) => `<tr><td class="w-tag">${esc(v.id)}</td><td>${esc(v.ref || '')}</td><td class="desc">${tx(v.step)}<br><span style="color:#8e96a6">${tx(v.expected)}</span></td><td><select class="field-input" data-m="validation.${i}.result"><option value=""${!v.result ? ' selected' : ''}>—</option><option value="ok"${v.result === 'ok' ? ' selected' : ''}>U</option><option value="nok"${v.result === 'nok' ? ' selected' : ''}>UD</option></select></td><td>${inp(`validation.${i}.date`, v.date, 'w-time')}</td><td>${inp(`validation.${i}.note.tr`, (v.note && v.note.tr) || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="desc">Şablonda validasyon testi yok.</td></tr>'}
+          ${M.validation.map((v, i) => `<tr><td class="w-tag">${esc(v.id)}</td><td>${esc(v.ref || '')}</td><td class="desc">${tx(v.step)}<br><span style="color:#8e96a6">${tx(v.expected)}</span></td><td><select class="field-input" data-m="validation.${i}.result"><option value=""${!v.result ? ' selected' : ''}>—</option><option value="ok"${v.result === 'ok' ? ' selected' : ''}>U</option><option value="nok"${v.result === 'nok' ? ' selected' : ''}>UD</option><option value="see"${v.result === 'see' ? ' selected' : ''}>Açıklamaya bakınız</option></select></td><td>${inp(`validation.${i}.date`, v.date, 'w-time')}</td><td>${inp(`validation.${i}.note.tr`, (v.note && v.note.tr) || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="desc">Şablonda validasyon testi yok.</td></tr>'}
           </tbody></table></div>`;
       }
       const files = own.list.map((f) => f.slice(unitDir.length + 1)).filter((f) => !/\.md$/i.test(f));
@@ -1840,6 +1845,8 @@ hazirlayan: Fatih GÜRAL
     $('homeList').addEventListener('click', (e) => {
       const nu = e.target.closest('[data-newunit]');
       if (nu) { e.stopPropagation(); newUnitDialog(findEntry(nu.dataset.newunit)); return; }
+      const dl = e.target.closest('[data-del]');
+      if (dl) { e.stopPropagation(); deleteDialog(findEntry(dl.dataset.del)); return; }
       const o = e.target.closest('[data-open]');
       if (o) { e.stopPropagation(); openEntry(findEntry(o.dataset.open)); }
     });
@@ -1851,7 +1858,7 @@ hazirlayan: Fatih GÜRAL
       else if (a.dataset.act === 'publish') publishDialog();
       else if (a.dataset.act === 'renew') renewDialog();
     });
-    $('homeList').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const o = e.target.closest('[data-open]'); if (o) openEntry(findEntry(o.dataset.open)); } });
+    $('homeList').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const dl = e.target.closest('[data-del]'); const o = e.target.closest('[data-open]'); if (!dl && !o) return; e.preventDefault(); e.stopPropagation(); if (dl) deleteDialog(findEntry(dl.dataset.del)); else openEntry(findEntry(o.dataset.open)); });
     $('btnRefreshHome').onclick = async () => {
       try { await store.refresh(true); } catch (e) { /* bağlantı hatası durum düğmesinde görünür */ }
       await scan();
@@ -1875,6 +1882,7 @@ hazirlayan: Fatih GÜRAL
     window.addEventListener('focus', homeTick);
     $('btnPdf').onclick = openPdfDialog;
     $('btnCover').onclick = openCoverStudio;
+    $('btnDelete').onclick = () => deleteDialog();
     $('btnMeasure').onclick = () => openMeasureStudio();
     $('btnNewUnit').onclick = () => newUnitDialog();
     bindZoom();

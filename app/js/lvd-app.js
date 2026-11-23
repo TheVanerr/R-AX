@@ -248,6 +248,7 @@
             <button type="button" class="icon-btn" id="lvdReload" title="lvd.md dosyasını yeniden oku"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
           </div>
           <div class="tb-group">
+            <button type="button" class="btn btn-sm btn-danger-line" id="lvdDelete" title="Bu LVD raporunu sil — onay için “raporun tam adı / Onaylıyorum” yazılır"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Sil</button>
             <button type="button" class="btn btn-sm btn-primary" id="lvdPdf" title="Raporu doğrudan PDF olarak indirir"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>PDF İndir</button>
             <button type="button" class="icon-btn" id="lvdClose" title="LVD'yi kapat (risk analizine dön)">×</button>
           </div>
@@ -357,6 +358,8 @@
     if ($('lvdCount')) $('lvdCount').textContent = out.length ? String(out.length) : '';
     return out;
   }
+  /** Liste kartındaki Sil: onay penceresini açar (raporu açmaz) */
+  const delBtn = (x) => `<span class="pc-del" data-lvd-del="${esc(x.path)}" role="button" tabindex="0" title="Bu LVD raporunu sil (onay: ${esc(x.name)} / Onaylıyorum)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Sil</span>`;
   function renderList() {
     const host = $('lvdCards');
     if (!S.list.length) {
@@ -364,14 +367,14 @@
       return;
     }
     host.innerHTML = S.list.map((x) => {
-      if (!x.m) return `<button type="button" class="project-card empty" data-lvd="${esc(x.path)}"><span class="pc-bar"></span><div class="pc-no">${esc(x.name)}</div><div class="pc-customer">lvd.md yok ya da okunamadı</div></button>`;
+      if (!x.m) return `<div class="project-card empty has-del" data-lvd="${esc(x.path)}" role="button" tabindex="0"><span class="pc-bar"></span>${delBtn(x)}<div class="pc-no">${esc(x.name)}</div><div class="pc-customer">lvd.md yok ya da okunamadı</div></div>`;
       const M = x.m.meta;
       const [c, t] = OVERALL[x.ev.overall];
       const chips = [`<span class="pc-chip">Rev ${esc(M.rev || '00')}</span>`, M.status === 'final' ? '<span class="pc-chip ok">Yayın</span>' : '<span class="pc-chip">Taslak</span>', `<span class="pc-chip ${c === 'green' ? 'ok' : c === 'red' ? 'bad' : 'warn'}">${t}</span>`, M.link ? `<span class="pc-chip has" title="Bağlı risk analizi: ${esc(M.link)}">${esc(M.riskDoc || 'Risk analizine bağlı')}</span>` : ''].join('');
-      return `<button type="button" class="project-card lvd-card" data-lvd="${esc(x.path)}"><span class="pc-bar"></span>
+      return `<div class="project-card lvd-card has-del" data-lvd="${esc(x.path)}" role="button" tabindex="0"><span class="pc-bar"></span>${delBtn(x)}
         <div class="pc-no">${esc(M.job || x.name)}</div><div class="pc-model">${esc(M.model || '')}</div><div class="pc-customer">${esc(M.customer || '')}</div>
         <div class="pc-chips">${chips}</div>
-        <div class="pc-meta">${esc(M.docNo || '')} · test ${esc(x.m.cond.date || '—')}${M.riskDoc ? ` · ${esc(M.riskDoc)}` : ''}</div></button>`;
+        <div class="pc-meta">${esc(M.docNo || '')} · test ${esc(x.m.cond.date || '—')}${M.riskDoc ? ` · ${esc(M.riskDoc)}` : ''}</div></div>`;
     }).join('');
   }
 
@@ -597,29 +600,53 @@
       <div class="file-group"><h3>LVD raporu <span class="file-count">${esc(S.path.split('/').pop())}</span></h3><div class="file-row"><span>lvd.md</span><span class="t">md</span></div>${dirs}</div>
       ${S.m.meta.link ? `<div class="file-note">Bağlı risk analizi: <code>${esc(S.m.meta.link)}</code> (yalnız okunur)</div>` : ''}
       <div class="file-note">Klasör: <code>${esc(S.path)}</code></div>
-      <div class="danger-zone"><h3>Tehlikeli bölge</h3><p>Bu LVD raporunun klasörü ve içindeki bütün dosyalar silinir. Bağlı risk analizi etkilenmez.</p><button type="button" class="btn btn-sm btn-danger-line" data-act="delete">LVD raporunu sil…</button></div>`;
+      <div class="danger-zone"><h3>Tehlikeli bölge</h3><p>Bu LVD raporunun klasörü ve içindeki bütün dosyalar silinir. Bağlı risk analizi etkilenmez. Onay için “<b>raporun tam adı / Onaylıyorum</b>” yazılır.</p><button type="button" class="btn btn-sm btn-danger-line" data-act="delete">LVD raporunu sil…</button></div>`;
   }
-  function deleteDialog() {
-    const name = S.path.split('/').pop();
+  /** LVD raporunu sil: açık rapor (path verilmezse) ya da listedeki kart. Onay: "<klasör adı> / Onaylıyorum" (RaUtil.delOk) */
+  async function deleteDialog(target) {
+    const path = target || S.path;
+    if (!path || !/^lvd\/[^/]+$/.test(path)) return;
+    const name = path.split('/').pop();
+    const isOpen = S.view === 'view' && S.path === path;
+    const hit = S.list.find((x) => x.path === path);
+    const M = (isOpen && S.m ? S.m.meta : hit && hit.m ? hit.m.meta : null) || {};
+    let files = [];
+    try { files = (await store.walk(path)).files || []; } catch (x) { files = []; }
+    const photos = files.filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f)).length;
+    const pdfs = files.filter((f) => /\.pdf$/i.test(f)).length;
+    const detail = [`${files.filter((f) => /\.md$/i.test(f)).length} md`, photos ? `${photos} fotoğraf` : '', pdfs ? `${pdfs} PDF` : ''].filter(Boolean).join(' · ');
+    const phrase = U.delPhrase(name);
+    const ok = (v) => U.delOk(v, name);
     modal(`<h2 class="danger">LVD raporunu sil</h2>
-      <div class="del-warn">Silinecek: <code>${esc(S.path)}</code> ve içindeki bütün dosyalar (lvd.md, fotoğraflar, PDF'ler).${store.mode === 'github' ? ' Depoda "Silindi" commit\'i olarak kalır; gerekirse geçmişten geri alınabilir.' : ''}</div>
-      <label class="del-label">Onay için klasörün adını yazın: <b class="del-phrase">${esc(name)}</b></label>
+      <p><b>${esc(M.docNo || name)}</b>${M.customer ? ` · ${esc(M.customer)}` : ''}${M.model ? ` · ${esc(M.model)}` : ''}${M.status === 'final' ? ` · <b>yayınlanmış (Rev ${esc(M.rev || '00')})</b>` : ''}</p>
+      <div class="del-warn"><b>${files.length} dosya</b> silinir${detail ? `: ${detail}` : ''}.<br>Klasör: <code>${esc(path)}</code><br>Bağlı risk analizi etkilenmez.${store.mode === 'github' ? ' Silme depoya kayıt (commit) olarak gider; dosyalar GitHub geçmişinde kalır, yanlışlıkla silinirse Claude geri getirebilir.' : " Dosyalar bilgisayardan <b>kalıcı olarak</b> silinir, Geri Dönüşüm Kutusu'na gitmez."}</div>
+      <label class="del-label" for="ldName">Onaylamak için raporun tam adını ve ardından <b>/ Onaylıyorum</b> yazın:<br><b class="del-phrase">${esc(phrase)}</b></label>
       <input class="field-input" id="ldName" autocomplete="off" spellcheck="false">
-      <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn btn-danger" id="ldGo" disabled>Sil</button></div>`, (box, close) => {
+      <div class="modal-actions"><button type="button" class="btn" data-x>Vazgeç</button><button type="button" class="btn btn-danger" id="ldGo" disabled>Bu raporu sil</button></div>`, (box, close) => {
       const inp = box.querySelector('#ldName');
       const go = box.querySelector('#ldGo');
-      inp.oninput = () => { go.disabled = inp.value.trim() !== name; };
+      inp.addEventListener('input', () => { go.disabled = !ok(inp.value); });
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !go.disabled) go.click(); });
       box.querySelector('[data-x]').onclick = close;
       go.onclick = async () => {
+        if (!ok(inp.value)) return;
         go.disabled = true;
+        inp.disabled = true;
+        go.textContent = 'Siliniyor…';
         try {
-          stopWatch();
-          await store.remove(S.path, { message: `Silindi: ${S.path}` });
+          if (isOpen) stopWatch();
+          await store.remove(path, { message: `Silindi: ${path}` });
           close();
-          S.m = null;
+          if (isOpen) S.m = null;
           await openList();
-          toast(`Silindi: ${S.path}`);
-        } catch (x) { toast(`Silinemedi: ${x.message}`, true); go.disabled = false; }
+          toast(`${name} silindi`);
+        } catch (x) {
+          toast(`Silinemedi: ${x.message}`, true);
+          if (isOpen && S.m) startWatch();
+          go.textContent = 'Bu raporu sil';
+          inp.disabled = false;
+          go.disabled = !ok(inp.value);
+        }
       };
     });
   }
@@ -1356,13 +1383,15 @@
     $('lvdBack').onclick = closeAll;
     $('lvdRefresh').onclick = async () => { try { await store.refresh(true); } catch (e) { /* yok */ } await openList(); toast('LVD raporları yeniden okundu'); };
     $('lvdNew').onclick = () => newDialog('');
-    $('lvdCards').addEventListener('click', (e) => { const c = e.target.closest('[data-lvd]'); if (c) openReport(c.dataset.lvd); });
+    $('lvdCards').addEventListener('click', (e) => { const d = e.target.closest('[data-lvd-del]'); if (d) { e.stopPropagation(); deleteDialog(d.dataset.lvdDel); return; } const c = e.target.closest('[data-lvd]'); if (c) openReport(c.dataset.lvd); });
+    $('lvdCards').addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const d = e.target.closest('[data-lvd-del]'); const c = e.target.closest('[data-lvd]'); if (!d && !c) return; e.preventDefault(); if (d) deleteDialog(d.dataset.lvdDel); else openReport(c.dataset.lvd); });
     $('lvdHome').onclick = () => openList();
     $('lvdClose').onclick = closeAll;
     $('lvdEdit').onclick = () => openStudio();
     $('lvdImport').onclick = async () => { try { await importFromRA(); } catch (x) { toast(`Aktarılamadı: ${x.message}`, true); } };
     $('lvdReload').onclick = reload;
     $('lvdPdf').onclick = openPdfDialog;
+    $('lvdDelete').onclick = () => deleteDialog();
     $('lvdLang').addEventListener('click', (e) => { const b = e.target.closest('[data-lang]'); if (b && S.m) { S.lang = b.dataset.lang; saveUI(); renderDoc(true); } });
     $('lvdZoom').addEventListener('click', (e) => { const b = e.target.closest('[data-z]'); if (!b) return; if (b.dataset.z === 'fit') setZoom('fit'); else stepZoom(b.dataset.z === '+' ? 1 : -1); });
     $('lvdWrap').addEventListener('wheel', (e) => {

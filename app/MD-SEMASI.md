@@ -199,7 +199,7 @@ Paragraf (yazılmazsa varsayılan "röle mantığı, yazılım yok" metni).
 ## V-01 · SF-01
 - adım: Çevrimin her fazında kapağı aç | Open the lid in every phase of the cycle | Deckel in jeder Zyklusphase öffnen
 - beklenen: Tehlikeli hareket ve püskürme anında durur | … | …
-- sonuç: U                         ← U (uygun) | UD (uygun değil) | boş
+- sonuç: U                         ← U (uygun) | UD (uygun değil) | Açıklamaya bakınız (sonuç yerine nota yönlendirir) | boş
 - tarih: 16.10.2026
 - not: … (isteğe bağlı)
 ```
